@@ -291,4 +291,17 @@ fn query() {
     assert_eq!(r[0], &[0, 1, 2]);
     assert_eq!(r[1], &[1, 2]);
     assert_eq!(r[2], &[3, 4, 5]);
+
+   let r = tree.query(&[7, 8, 9, 0, 1, 2, 7, 8, 3, 4, 5, 6]);
+    assert_eq!(r[0], &[0, 1, 2]);
+    assert_eq!(r[1], &[1, 2]);
+    assert_eq!(r[2], &[3, 4, 5]);
+    // chinese
+    let mut tree = trie::Trie::default();
+    tree.add_key_word("中国人".as_bytes().to_vec());
+    tree.add_key_word("abc".as_bytes().to_vec());
+   let text = "abc你好,中国人";
+   let r = tree.query(text.as_bytes().as_ref());
+    assert_eq!(r[0], "abc".as_bytes().as_ref());
+    assert_eq!(r[1], "中国人".as_bytes().as_ref());
 }
