@@ -3,6 +3,10 @@ name = "word_sensitive"
 version = "0.1.0"
 authors = ["yangcancai <admin.com>"]
 edition = "2018"
+license-file = "LICENSE"
+description = "A library for sensitive string matching, the implementation language is rust, and the algorithm used is ac"
+repository = "https://github.com/yangcancai/word_sensitive/"
+homepage = "https://github.com/yangcancai/word_sensitive"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
