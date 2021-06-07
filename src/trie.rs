@@ -80,7 +80,11 @@ impl Trie {
             cur = temp;
         }
         // Append key_word_len
-        cur.borrow_mut().key_word_len.push(key_word.len());
+       let c = cur.borrow().key_word_len.clone();
+       let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
+       if temp.is_empty(){
+           cur.borrow_mut().key_word_len.push(key_word.len());
+       }
     }
     pub fn build(&mut self) {
         let mut queue = VecDeque::new();
@@ -91,7 +95,7 @@ impl Trie {
             queue.push_back(child.clone());
         }
         while let Some(node) = queue.pop_front() {
-            let cur = node.borrow_mut();
+            let cur = node.borrow();
             // Find fail for all children
             for (i, child) in cur.children.iter() {
                 // Father fail
@@ -108,20 +112,23 @@ impl Trie {
                 {
                     fafail = fafail.upgrade().unwrap().borrow().fail.clone();
                 }
-                child.borrow_mut().fail = match fafail.upgrade() {
+                let temp = match fafail.upgrade() {
                     // Fafail is none ,we knonw fafail is root
                     None => Rc::downgrade(&self.root.clone()),
                     // Else fafail.children[i] will be child fail poiter
                     Some(v) => {
-                        let children_i = v.borrow().children.get(&i).unwrap().clone();
+                    let children_i = v.borrow().children.get(&i).unwrap().clone();
+                    children_i.borrow().key_word_len.iter().for_each(|&x|{
+                             child
+                             .borrow_mut()
+                             .key_word_len
+                             .push(x);
+                    });
                         // Append key_word_len for other key_word
-                        child
-                            .borrow_mut()
-                            .key_word_len
-                            .append(&mut children_i.borrow().key_word_len.clone());
-                        Rc::downgrade(&children_i)
+                         Rc::downgrade(&v.borrow().children.get(&i).unwrap().clone())
                     }
                 };
+                child.borrow_mut().fail = temp;
                 queue.push_back(child.clone())
             }
         }

@@ -22,6 +22,7 @@
 /// Created : 2021-06-03T04:18:52+00:00
 ///-------------------------------------------------------------------
 use word_sensitive::trie;
+use std::{fs::File, io::Read};
 #[test]
 fn add() {
     let mut tree = trie::Trie::default();
@@ -301,7 +302,24 @@ fn query() {
     tree.add_key_word("中国人".as_bytes().to_vec());
     tree.add_key_word("abc".as_bytes().to_vec());
    let text = "abc你好,中国人";
+   tree.build();
    let r = tree.query(text.as_bytes().as_ref());
     assert_eq!(r[0], "abc".as_bytes().as_ref());
     assert_eq!(r[1], "中国人".as_bytes().as_ref());
+}
+#[test]
+fn key_words_from_file(){
+    let mut tree = trie::Trie::default();
+    let key_words = key_words().unwrap();
+    key_words.iter().for_each(|x| tree.add_key_word(x.as_bytes().to_vec()));
+    tree.build();
+    let r = tree.query("回民吃猪肉".as_bytes().as_ref());
+    assert_eq!(r[0], "回民".as_bytes().as_ref());
+    assert_eq!(r[1], "回民吃猪肉".as_bytes().as_ref());
+}
+fn key_words() -> std::io::Result<Vec<String>>{
+    let mut file = File::open("key_words/keywords.txt")?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents.split("\n").map(|x|x.to_string()).collect::<Vec<String>>())
 }
