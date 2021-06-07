@@ -22,6 +22,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::fs::File;
+use std::io::Read;
 use std::rc::{Rc, Weak};
 type Value = u8;
 type NodePtr = Rc<RefCell<Node>>;
@@ -68,6 +70,42 @@ impl Default for Trie {
     }
 }
 impl Trie {
+    /// Add keywords from file
+    ///
+    /// # Examples
+    /// 
+    ///
+    /// ```
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word_from_file("key_words/keywords.txt").unwrap();
+    /// tree.build();
+    /// let matches = tree.query("回民吃猪肉".as_bytes().as_ref());
+    /// assert_eq!(matches[0], "回民".as_bytes().as_ref());
+    /// assert_eq!(matches[1], "回民吃猪肉".as_bytes().as_ref());
+    /// ```
+    pub fn add_key_word_from_file(&mut self, file: &str) -> std::io::Result<()> {
+      let mut file = File::open(file)?;
+      let mut contents = String::new();
+      file.read_to_string(&mut contents)?;
+      contents.split('\n').for_each(|x| self.add_key_word(x.as_bytes().to_vec()));
+      Ok(())
+    }
+    /// Add keyword 
+    ///
+    /// # Examples
+    ///
+    ///
+    /// ```
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word("abc".as_bytes().to_vec());
+    /// tree.add_key_word("bcd".as_bytes().to_vec());
+    /// tree.build();
+    /// let matches = tree.query("hello, abcd".as_bytes().as_ref());
+    /// assert_eq!(matches[0], "abc".as_bytes().as_ref());
+    /// assert_eq!(matches[1], "bcd".as_bytes().as_ref());
+    /// ```
     pub fn add_key_word(&mut self, key_word: Vec<Value>) {
         let mut cur = self.root.clone();
         for (_, val) in key_word.iter().enumerate() {
@@ -80,12 +118,29 @@ impl Trie {
             cur = temp;
         }
         // Append key_word_len
-       let c = cur.borrow().key_word_len.clone();
-       let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
-       if temp.is_empty(){
-           cur.borrow_mut().key_word_len.push(key_word.len());
-       }
+        let c = cur.borrow().key_word_len.clone();
+        let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
+        if temp.is_empty() {
+            cur.borrow_mut().key_word_len.push(key_word.len());
+        }
     }
+    /// Build fail pointer for tree
+    ///
+    /// # Examples
+    ///
+    ///
+    /// ```
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word("abc".as_bytes().to_vec());
+    /// tree.add_key_word("bac".as_bytes().to_vec());
+    /// tree.add_key_word("aac".as_bytes().to_vec());
+    /// tree.add_key_word("bcd".as_bytes().to_vec());
+    /// tree.build();
+    /// let matches = tree.query("abcdef".as_bytes().as_ref());
+    /// assert_eq!(matches[0], "abc".as_bytes().as_ref()) ;
+    /// assert_eq!(matches[1], "bcd".as_bytes().as_ref()) ;
+    /// ```
     pub fn build(&mut self) {
         let mut queue = VecDeque::new();
         // First level all child fail poiter is root
@@ -117,15 +172,12 @@ impl Trie {
                     None => Rc::downgrade(&self.root.clone()),
                     // Else fafail.children[i] will be child fail poiter
                     Some(v) => {
-                    let children_i = v.borrow().children.get(&i).unwrap().clone();
-                    children_i.borrow().key_word_len.iter().for_each(|&x|{
-                             child
-                             .borrow_mut()
-                             .key_word_len
-                             .push(x);
-                    });
+                        let children_i = v.borrow().children.get(&i).unwrap().clone();
+                        children_i.borrow().key_word_len.iter().for_each(|&x| {
+                            child.borrow_mut().key_word_len.push(x);
+                        });
                         // Append key_word_len for other key_word
-                         Rc::downgrade(&v.borrow().children.get(&i).unwrap().clone())
+                        Rc::downgrade(&v.borrow().children.get(&i).unwrap().clone())
                     }
                 };
                 child.borrow_mut().fail = temp;
@@ -133,6 +185,52 @@ impl Trie {
             }
         }
     }
+    /// Query all key_words input text string
+    /// 
+    /// # Examples 
+    ///
+    ///
+    /// ```
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word("aaa".as_bytes().to_vec());
+    /// tree.add_key_word("aab".as_bytes().to_vec());
+    /// tree.add_key_word("aac".as_bytes().to_vec());
+    /// tree.add_key_word("aba".as_bytes().to_vec());
+    /// tree.add_key_word("abb".as_bytes().to_vec());
+    /// tree.add_key_word("abc".as_bytes().to_vec());
+    /// tree.add_key_word("aca".as_bytes().to_vec());
+    /// tree.add_key_word("acb".as_bytes().to_vec());
+    /// tree.add_key_word("acc".as_bytes().to_vec());
+    /// tree.add_key_word("baa".as_bytes().to_vec());
+    /// tree.add_key_word("bab".as_bytes().to_vec());
+    /// tree.add_key_word("bac".as_bytes().to_vec());
+    /// tree.add_key_word("bba".as_bytes().to_vec());
+    /// tree.add_key_word("bbb".as_bytes().to_vec());
+    /// tree.add_key_word("bbc".as_bytes().to_vec());
+    /// tree.add_key_word("bca".as_bytes().to_vec());
+    /// tree.add_key_word("bcb".as_bytes().to_vec());
+    /// tree.add_key_word("bcc".as_bytes().to_vec());
+    /// tree.add_key_word("caa".as_bytes().to_vec());
+    /// tree.add_key_word("cab".as_bytes().to_vec());
+    /// tree.add_key_word("cac".as_bytes().to_vec());
+    /// tree.add_key_word("cba".as_bytes().to_vec());
+    /// tree.add_key_word("cbb".as_bytes().to_vec());
+    /// tree.add_key_word("cbc".as_bytes().to_vec());
+    /// tree.add_key_word("cca".as_bytes().to_vec());
+    /// tree.add_key_word("ccb".as_bytes().to_vec());
+    /// tree.add_key_word("ccc".as_bytes().to_vec());
+    /// tree.build();
+    /// let matches = tree.query("abcabcbcca".as_bytes().as_ref());
+    /// assert_eq!(matches[0], "abc".as_bytes().as_ref());
+    /// assert_eq!(matches[1], "bca".as_bytes().as_ref());
+    /// assert_eq!(matches[2], "cab".as_bytes().as_ref());
+    /// assert_eq!(matches[3], "abc".as_bytes().as_ref());
+    /// assert_eq!(matches[4], "bcb".as_bytes().as_ref());
+    /// assert_eq!(matches[5], "cbc".as_bytes().as_ref());
+    /// assert_eq!(matches[6], "bcc".as_bytes().as_ref());
+    /// assert_eq!(matches[7], "cca".as_bytes().as_ref());
+    /// ```
     pub fn query<'a>(&self, text: &'a [Value]) -> Vec<&'a [Value]> {
         let mut result: Vec<&[Value]> = Vec::new();
         let mut cur = Rc::downgrade(&self.root);

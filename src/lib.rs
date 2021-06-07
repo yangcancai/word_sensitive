@@ -19,4 +19,8 @@
 // @end
 // Created : 2021-06-03T03:51:18+00:00
 //-------------------------------------------------------------------
+
+//! A library for sensitive string matching, the implementation language is rust, and the algorithm used is ac
+
 pub mod trie;
+pub use crate::trie::Trie;

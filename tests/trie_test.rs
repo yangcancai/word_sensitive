@@ -21,11 +21,11 @@
 /// @end
 /// Created : 2021-06-03T04:18:52+00:00
 ///-------------------------------------------------------------------
+use word_sensitive::Trie;
 use word_sensitive::trie;
-use std::{fs::File, io::Read};
 #[test]
 fn add() {
-    let mut tree = trie::Trie::default();
+    let mut tree = Trie::default();
     tree.add_key_word(vec![0]);
     if tree.root.borrow().val != None {
         assert_eq!(true, false);
@@ -293,7 +293,7 @@ fn query() {
     assert_eq!(r[1], &[1, 2]);
     assert_eq!(r[2], &[3, 4, 5]);
 
-   let r = tree.query(&[7, 8, 9, 0, 1, 2, 7, 8, 3, 4, 5, 6]);
+    let r = tree.query(&[7, 8, 9, 0, 1, 2, 7, 8, 3, 4, 5, 6]);
     assert_eq!(r[0], &[0, 1, 2]);
     assert_eq!(r[1], &[1, 2]);
     assert_eq!(r[2], &[3, 4, 5]);
@@ -301,30 +301,23 @@ fn query() {
     let mut tree = trie::Trie::default();
     tree.add_key_word("中国人".as_bytes().to_vec());
     tree.add_key_word("abc".as_bytes().to_vec());
-   let text = "abc你好,中国人";
-   tree.build();
-   let r = tree.query(text.as_bytes().as_ref());
+    let text = "abc你好,中国人";
+    tree.build();
+    let r = tree.query(text.as_bytes().as_ref());
     assert_eq!(r[0], "abc".as_bytes().as_ref());
     assert_eq!(r[1], "中国人".as_bytes().as_ref());
 }
 #[test]
-fn key_words_from_file(){
+fn key_words_from_file() {
     let mut tree = trie::Trie::default();
-    let key_words = key_words().unwrap();
-    key_words.iter().for_each(|x| tree.add_key_word(x.as_bytes().to_vec()));
+    tree.add_key_word_from_file("key_words/keywords.txt").unwrap();
     tree.build();
     let r = tree.query("回民吃猪肉".as_bytes().as_ref());
     assert_eq!(r[0], "回民".as_bytes().as_ref());
     assert_eq!(r[1], "回民吃猪肉".as_bytes().as_ref());
 }
-fn key_words() -> std::io::Result<Vec<String>>{
-    let mut file = File::open("key_words/keywords.txt")?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents.split("\n").map(|x|x.to_string()).collect::<Vec<String>>())
-}
 #[test]
-fn specail_build(){
+fn specail_build() {
     let mut tree = trie::Trie::default();
     tree.add_key_word("aaa".as_bytes().to_vec());
     tree.add_key_word("aab".as_bytes().to_vec());
@@ -333,38 +326,31 @@ fn specail_build(){
     tree.add_key_word("aba".as_bytes().to_vec());
     tree.add_key_word("abb".as_bytes().to_vec());
     tree.add_key_word("abc".as_bytes().to_vec());
-    
+
     tree.add_key_word("aca".as_bytes().to_vec());
     tree.add_key_word("acb".as_bytes().to_vec());
     tree.add_key_word("acc".as_bytes().to_vec());
 
- 
     tree.add_key_word("baa".as_bytes().to_vec());
     tree.add_key_word("bab".as_bytes().to_vec());
     tree.add_key_word("bac".as_bytes().to_vec());
 
- 
     tree.add_key_word("bba".as_bytes().to_vec());
     tree.add_key_word("bbb".as_bytes().to_vec());
     tree.add_key_word("bbc".as_bytes().to_vec());
 
- 
     tree.add_key_word("bca".as_bytes().to_vec());
     tree.add_key_word("bcb".as_bytes().to_vec());
     tree.add_key_word("bcc".as_bytes().to_vec());
 
- 
     tree.add_key_word("caa".as_bytes().to_vec());
     tree.add_key_word("cab".as_bytes().to_vec());
     tree.add_key_word("cac".as_bytes().to_vec());
 
-
- 
     tree.add_key_word("cba".as_bytes().to_vec());
     tree.add_key_word("cbb".as_bytes().to_vec());
     tree.add_key_word("cbc".as_bytes().to_vec());
 
- 
     tree.add_key_word("cca".as_bytes().to_vec());
     tree.add_key_word("ccb".as_bytes().to_vec());
     tree.add_key_word("ccc".as_bytes().to_vec());
