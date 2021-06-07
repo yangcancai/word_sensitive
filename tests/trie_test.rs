@@ -323,3 +323,65 @@ fn key_words() -> std::io::Result<Vec<String>>{
     file.read_to_string(&mut contents)?;
     Ok(contents.split("\n").map(|x|x.to_string()).collect::<Vec<String>>())
 }
+#[test]
+fn specail_build(){
+    let mut tree = trie::Trie::default();
+    tree.add_key_word("aaa".as_bytes().to_vec());
+    tree.add_key_word("aab".as_bytes().to_vec());
+    tree.add_key_word("aac".as_bytes().to_vec());
+
+    tree.add_key_word("aba".as_bytes().to_vec());
+    tree.add_key_word("abb".as_bytes().to_vec());
+    tree.add_key_word("abc".as_bytes().to_vec());
+    
+    tree.add_key_word("aca".as_bytes().to_vec());
+    tree.add_key_word("acb".as_bytes().to_vec());
+    tree.add_key_word("acc".as_bytes().to_vec());
+
+ 
+    tree.add_key_word("baa".as_bytes().to_vec());
+    tree.add_key_word("bab".as_bytes().to_vec());
+    tree.add_key_word("bac".as_bytes().to_vec());
+
+ 
+    tree.add_key_word("bba".as_bytes().to_vec());
+    tree.add_key_word("bbb".as_bytes().to_vec());
+    tree.add_key_word("bbc".as_bytes().to_vec());
+
+ 
+    tree.add_key_word("bca".as_bytes().to_vec());
+    tree.add_key_word("bcb".as_bytes().to_vec());
+    tree.add_key_word("bcc".as_bytes().to_vec());
+
+ 
+    tree.add_key_word("caa".as_bytes().to_vec());
+    tree.add_key_word("cab".as_bytes().to_vec());
+    tree.add_key_word("cac".as_bytes().to_vec());
+
+
+ 
+    tree.add_key_word("cba".as_bytes().to_vec());
+    tree.add_key_word("cbb".as_bytes().to_vec());
+    tree.add_key_word("cbc".as_bytes().to_vec());
+
+ 
+    tree.add_key_word("cca".as_bytes().to_vec());
+    tree.add_key_word("ccb".as_bytes().to_vec());
+    tree.add_key_word("ccc".as_bytes().to_vec());
+
+    tree.build();
+    let r = tree.query("abccbabacaacabc".as_ref());
+    assert_eq!(r[0], "abc".as_bytes().as_ref());
+    assert_eq!(r[1], "bcc".as_bytes().as_ref());
+    assert_eq!(r[2], "ccb".as_bytes().as_ref());
+    assert_eq!(r[3], "cba".as_bytes().as_ref());
+    assert_eq!(r[4], "bab".as_bytes().as_ref());
+    assert_eq!(r[5], "aba".as_bytes().as_ref());
+    assert_eq!(r[6], "bac".as_bytes().as_ref());
+    assert_eq!(r[7], "aca".as_bytes().as_ref());
+    assert_eq!(r[8], "caa".as_bytes().as_ref());
+    assert_eq!(r[9], "aac".as_bytes().as_ref());
+    assert_eq!(r[10], "aca".as_bytes().as_ref());
+    assert_eq!(r[11], "cab".as_bytes().as_ref());
+    assert_eq!(r[12], "abc".as_bytes().as_ref());
+}
