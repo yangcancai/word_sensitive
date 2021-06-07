@@ -1,6 +1,7 @@
 # word_sensitive
 A library for sensitive string matching, the implementation language is rust, and the algorithm used is ac
 
+![CI](https://github.com/yangcancai/word_sensitive/actions/workflows/ci.yml/badge.svg)
 # How to use?
 
 * Add keywords to trie
