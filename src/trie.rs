@@ -24,9 +24,10 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
-use std::rc::{Rc, Weak};
+use std::sync::Weak;
+use std::sync::Arc;
 type Value = u8;
-type NodePtr = Rc<RefCell<Node>>;
+type NodePtr = Arc<RefCell<Node>>;
 type WeakPtr = Weak<RefCell<Node>>;
 #[derive(Debug)]
 pub struct Node {
@@ -54,7 +55,7 @@ impl Default for Node {
 }
 impl Node {
     pub fn new(val: Value) -> NodePtr {
-        Rc::new(RefCell::new(Node {
+        Arc::new(RefCell::new(Node {
             fail: Weak::new(),
             children: HashMap::new(),
             val: Some(val),
@@ -65,7 +66,7 @@ impl Node {
 impl Default for Trie {
     fn default() -> Self {
         Trie {
-            root: Rc::new(RefCell::new(Node::default())),
+            root: Arc::new(RefCell::new(Node::default())),
         }
     }
 }
@@ -146,7 +147,7 @@ impl Trie {
         // First level all child fail poiter is root
         let first_level_fail = self.root.clone();
         for (_i, child) in self.root.borrow().children.iter() {
-            child.borrow_mut().fail = Rc::downgrade(&first_level_fail.clone());
+            child.borrow_mut().fail = Arc::downgrade(&first_level_fail.clone());
             queue.push_back(child.clone());
         }
         while let Some(node) = queue.pop_front() {
@@ -169,7 +170,7 @@ impl Trie {
                 }
                 let temp = match fafail.upgrade() {
                     // Fafail is none ,we knonw fafail is root
-                    None => Rc::downgrade(&self.root.clone()),
+                    None => Arc::downgrade(&self.root.clone()),
                     // Else fafail.children[i] will be child fail poiter
                     Some(v) => {
                         let children_i = v.borrow().children.get(&i).unwrap().clone();
@@ -177,7 +178,7 @@ impl Trie {
                             child.borrow_mut().key_word_len.push(x);
                         });
                         // Append key_word_len for other key_word
-                        Rc::downgrade(&v.borrow().children.get(&i).unwrap().clone())
+                        Arc::downgrade(&v.borrow().children.get(&i).unwrap().clone())
                     }
                 };
                 child.borrow_mut().fail = temp;
@@ -233,21 +234,21 @@ impl Trie {
     /// ```
     pub fn query<'a>(&self, text: &'a [Value]) -> Vec<&'a [Value]> {
         let mut result: Vec<&[Value]> = Vec::new();
-        let mut cur = Rc::downgrade(&self.root);
+        let mut cur = Arc::downgrade(&self.root);
         for (i, e) in text.iter().enumerate() {
             if let Some(v) = cur.upgrade() {
                 // Find  child, child is none, let fail.children[e]
                 // until fail.children[e] is not none or fail equal none
-                let mut child = Rc::downgrade(&v.clone());
+                let mut child = Arc::downgrade(&v.clone());
                 while child.upgrade().unwrap().borrow().children.get(e).is_none() {
                     if child.upgrade().unwrap().borrow().fail.upgrade().is_none() {
-                        child = Rc::downgrade(&self.root.clone());
+                        child = Arc::downgrade(&self.root.clone());
                         break;
                     }
                     child = child.upgrade().unwrap().borrow().fail.clone();
                 }
                 cur = match child.upgrade().unwrap().borrow().children.get(e) {
-                    None => Rc::downgrade(&self.root),
+                    None => Arc::downgrade(&self.root),
                     Some(child) => {
                         result.append(
                             &mut child
@@ -257,11 +258,11 @@ impl Trie {
                                 .map(|x| &text[i + 1 - x..i + 1])
                                 .collect(),
                         );
-                        Rc::downgrade(&child)
+                        Arc::downgrade(&child)
                     }
                 }
             } else {
-                cur = Rc::downgrade(&self.root);
+                cur = Arc::downgrade(&self.root);
             }
         }
         result
