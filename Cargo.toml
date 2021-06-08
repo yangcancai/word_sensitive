@@ -1,6 +1,6 @@
 [package]
 name = "word_sensitive"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["yangcancai <admin.com>"]
 edition = "2018"
 license-file = "LICENSE"
