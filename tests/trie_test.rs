@@ -299,35 +299,38 @@ fn specail_build() {
     tree.add_key_word("aaa".as_bytes().to_vec());
     tree.add_key_word("aab".as_bytes().to_vec());
     tree.add_key_word("aac".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("aba".as_bytes().to_vec());
     tree.add_key_word("abb".as_bytes().to_vec());
     tree.add_key_word("abc".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("aca".as_bytes().to_vec());
     tree.add_key_word("acb".as_bytes().to_vec());
     tree.add_key_word("acc".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("baa".as_bytes().to_vec());
     tree.add_key_word("bab".as_bytes().to_vec());
     tree.add_key_word("bac".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("bba".as_bytes().to_vec());
     tree.add_key_word("bbb".as_bytes().to_vec());
     tree.add_key_word("bbc".as_bytes().to_vec());
-
+    tree.build();
+    tree.add_key_word("bba".as_bytes().to_vec());
     tree.add_key_word("bca".as_bytes().to_vec());
     tree.add_key_word("bcb".as_bytes().to_vec());
     tree.add_key_word("bcc".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("caa".as_bytes().to_vec());
     tree.add_key_word("cab".as_bytes().to_vec());
     tree.add_key_word("cac".as_bytes().to_vec());
 
+    tree.build();
     tree.add_key_word("cba".as_bytes().to_vec());
     tree.add_key_word("cbb".as_bytes().to_vec());
     tree.add_key_word("cbc".as_bytes().to_vec());
 
+    tree.build();
     tree.add_key_word("cca".as_bytes().to_vec());
     tree.add_key_word("ccb".as_bytes().to_vec());
     tree.add_key_word("ccc".as_bytes().to_vec());
@@ -349,7 +352,7 @@ fn specail_build() {
     assert_eq!(r[12], "abc".as_bytes().as_ref());
 }
 #[test]
-fn thread_safe(){
+fn thread_safe() {
     let mut tree = trie::Trie::default();
     tree.add_key_word("abc".as_bytes().to_vec());
     let mm = Arc::new(RwLock::new(tree));
@@ -357,10 +360,13 @@ fn thread_safe(){
     let thread = thread::spawn(move || {
         let r = clone.read().unwrap().query("abcbc".as_bytes().as_ref());
         assert_eq!(r[0], "abc".as_bytes().as_ref());
-        clone.write().unwrap().add_key_word("bc".as_bytes().to_vec());
+        clone
+            .write()
+            .unwrap()
+            .add_key_word("bc".as_bytes().to_vec());
     });
     thread.join().unwrap();
-     let r = mm.read().unwrap().query("abcbc".as_bytes().as_ref());
-     assert_eq!(r[0], "abc".as_bytes().as_ref());
-     assert_eq!(r[1], "bc".as_bytes().as_ref());
+    let r = mm.read().unwrap().query("abcbc".as_bytes().as_ref());
+    assert_eq!(r[0], "abc".as_bytes().as_ref());
+    assert_eq!(r[1], "bc".as_bytes().as_ref());
 }

@@ -177,7 +177,10 @@ impl Trie {
                         Some(v) => {
                             let children_i = (*v.as_ptr()).children.get(&i).unwrap();
                             (*children_i.as_ptr()).key_word_len.iter().for_each(|&x| {
-                                (*child.as_ptr()).key_word_len.push(x);
+                               let temp: Vec<&usize> = (*child.as_ptr()).key_word_len.iter().filter(|&y| *y == x).collect();
+                               if temp.is_empty(){
+                                    (*child.as_ptr()).key_word_len.push(x);
+                               }
                             });
                             // Append key_word_len for other key_word
                             Some(*(*v.as_ptr()).children.get(&i).unwrap())
