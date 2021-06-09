@@ -272,3 +272,7 @@ impl Trie {
 unsafe impl Send for Trie {}
 
 unsafe impl Sync for Trie {}
+
+unsafe impl Send for Node {}
+
+unsafe impl Sync for Node {}
