@@ -269,3 +269,6 @@ impl Trie {
         result
     }
 }
+unsafe impl Send for Trie {}
+
+unsafe impl Sync for Trie {}
