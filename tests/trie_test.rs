@@ -1,3 +1,4 @@
+use word_sensitive::trie;
 ///-------------------------------------------------------------------
 /// @author yangcancai
 
@@ -22,34 +23,44 @@
 /// Created : 2021-06-03T04:18:52+00:00
 ///-------------------------------------------------------------------
 use word_sensitive::Trie;
-use word_sensitive::trie;
 #[test]
 fn add() {
     let mut tree = Trie::default();
     tree.add_key_word(vec![0]);
-    unsafe{
-    if (*tree.root.as_ptr()).val != None {
-        assert_eq!(true, false);
+    unsafe {
+        if (*tree.root.as_ptr()).val != None {
+            assert_eq!(true, false);
+        }
+        assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).val, Some(0));
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&0].as_ptr())
+                .children
+                .len(),
+            0
+        );
+        tree.add_key_word(vec![0, 1]);
+        tree.build();
+        assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).val, Some(0));
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&0].as_ptr())
+                .children
+                .len(),
+            1
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).val,
+            Some(1)
+        );
+        assert_eq!((*tree.root.as_ptr()).key_word_len, Vec::new());
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len,
+            vec![1]
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).key_word_len,
+            vec![2]
+        );
     }
-    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).val, Some(0));
-    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).children.len(), 0);
-    tree.add_key_word(vec![0, 1]);
-    tree.build();
-    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).val, Some(0));
-    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).children.len(), 1);
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).val,
-        Some(1)
-    );
-    assert_eq!((*tree.root.as_ptr()).key_word_len, Vec::new());
-    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len, vec![1]);
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
-            .as_ptr())
-            .key_word_len,
-        vec![2]
-    );
-}
 }
 #[test]
 fn query() {
@@ -58,214 +69,181 @@ fn query() {
     tree.add_key_word(vec![1, 2]);
     tree.add_key_word(vec![1, 2, 3]);
     tree.add_key_word(vec![3, 4, 5]);
-    unsafe{
-    assert_eq!(
-        (*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
-            .as_ptr())
+    unsafe {
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).children[&2]
+                .as_ptr())
             .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
-            .as_ptr())
-            .children[&2]
-            .as_ptr())
-            .key_word_len,
-        vec![3]
-    );
+            vec![3]
+        );
 
-    assert_eq!(
-        (*(*tree.root.as_ptr()).children[&1].as_ptr()).key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
-            .as_ptr())
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&1].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2].as_ptr()).key_word_len,
+            vec![2]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2].as_ptr()).children[&3]
+                .as_ptr())
             .key_word_len,
-        vec![2]
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
-            .as_ptr())
-            .children[&3]
-            .as_ptr())
-            .key_word_len,
-        vec![3]
-    );
+            vec![3]
+        );
 
-    assert_eq!(
-        (*(*tree.root.as_ptr()).children[&3].as_ptr()).key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
-            .as_ptr())
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&3].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4].as_ptr()).children[&5]
+                .as_ptr())
             .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
-            .as_ptr())
-            .children[&5]
-            .as_ptr())
-            .key_word_len,
-        vec![3]
-    );
+            vec![3]
+        );
 
-    tree.build();
-    // key_word_len
-    assert_eq!(
-        (*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
-            .as_ptr())
+        tree.build();
+        // key_word_len
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).children[&2]
+                .as_ptr())
             .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
-            .as_ptr())
-            .children[&2]
-            .as_ptr())
-            .key_word_len,
-        vec![3, 2]
-    );
+            vec![3, 2]
+        );
 
-    assert_eq!(
-        (*(*tree.root.as_ptr()).children[&1].as_ptr()).key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
-            .as_ptr())
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&1].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2].as_ptr()).key_word_len,
+            vec![2]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2].as_ptr()).children[&3]
+                .as_ptr())
             .key_word_len,
-        vec![2]
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
-            .as_ptr())
-            .children[&3]
-            .as_ptr())
+            vec![3]
+        );
+
+        assert_eq!(
+            (*(*tree.root.as_ptr()).children[&3].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4].as_ptr()).key_word_len,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4].as_ptr()).children[&5]
+                .as_ptr())
             .key_word_len,
-        vec![3]
-    );
+            vec![3]
+        );
 
-    assert_eq!(
-        (*(*tree.root.as_ptr()).children[&3].as_ptr()).key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
+        // fail
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&0].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
+            .val,
+            None
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
+            .val,
+            Some(1)
+        );
+        assert_eq!(
+            (*(*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).children
+                [&2]
+                .as_ptr())
+            .fail
+            .unwrap()
             .as_ptr())
-            .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
-            .as_ptr())
-            .children[&5]
-            .as_ptr())
-            .key_word_len,
-        vec![3]
-    );
+            .val,
+            Some(2)
+        );
 
-    // fail
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&0]
-            .as_ptr())
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&1].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
+            .val,
+            None
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
+            .val,
+            None
+        );
+        assert_eq!(
+            (*(*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2].as_ptr()).children
+                [&3]
+                .as_ptr())
             .fail
             .unwrap()
             .as_ptr())
             .val,
-        None
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
-            .as_ptr())
-            .fail
-            .unwrap()
-            .as_ptr())
-            .val,
-        Some(1)
-    );
-    assert_eq!(
-        (*(*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
-            .as_ptr())
-            .children[&2]
-            .as_ptr())
-            .fail
-            .unwrap()
-            .as_ptr())
-            .val,
-        Some(2)
-    );
+            Some(3)
+        );
 
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&1]
-            .as_ptr())
+        assert_eq!(
+            (*(*(*tree.root.as_ptr()).children[&3].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
+            .val,
+            None
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
+            .val,
+            None
+        );
+        assert_eq!(
+            (*(*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4].as_ptr()).children
+                [&5]
+                .as_ptr())
             .fail
             .unwrap()
             .as_ptr())
             .val,
-        None
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
-            .as_ptr())
-            .fail
-            .unwrap()
-            .as_ptr())
-            .val,
-        None
-    );
-    assert_eq!(
-        (*(*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
-            .as_ptr())
-            .children[&3]
-            .as_ptr())
-            .fail
-            .unwrap()
-            .as_ptr())
-            .val,
-        Some(3)
-    );
-
-    assert_eq!(
-        (*(*(*tree.root.as_ptr()).children[&3]
-            .as_ptr())
-            .fail
-            .unwrap()
-            .as_ptr())
-            .val,
-        None
-    );
-    assert_eq!(
-        (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
-            .as_ptr())
-            .fail
-            .unwrap()
-            .as_ptr())
-            .val,
-        None
-    );
-    assert_eq!(
-        (*(*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
-            .as_ptr())
-            .children[&5]
-            .as_ptr())
-            .fail
-            .unwrap()
-            .as_ptr())
-            .val,
-        None
-    );
-}
+            None
+        );
+    }
 
     let r = tree.query(&[1, 2, 3]);
     assert_eq!(r[0], &[1, 2]);
@@ -304,7 +282,8 @@ fn query() {
 #[test]
 fn key_words_from_file() {
     let mut tree = trie::Trie::default();
-    tree.add_key_word_from_file("key_words/keywords.txt").unwrap();
+    tree.add_key_word_from_file("key_words/keywords.txt")
+        .unwrap();
     tree.build();
     let r = tree.query("回民吃猪肉".as_bytes().as_ref());
     assert_eq!(r[0], "回民".as_bytes().as_ref());

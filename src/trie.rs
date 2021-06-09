@@ -19,11 +19,11 @@
 // @end
 // Created : 2021-06-03T03:59:08+00:00
 //-------------------------------------------------------------------
+use core::ptr::NonNull;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
-use core::ptr::NonNull;
 type Value = u8;
 type NodePtr = NonNull<Node>;
 #[derive(Debug)]
@@ -41,7 +41,7 @@ pub struct Trie {
     pub root: NodePtr,
 }
 impl Default for Node {
-    fn default() -> Self{
+    fn default() -> Self {
         Node {
             fail: None,
             children: HashMap::new(),
@@ -51,13 +51,14 @@ impl Default for Node {
     }
 }
 impl Node {
-    pub fn new(val: Value) -> NodePtr{
+    pub fn new(val: Value) -> NodePtr {
         Box::leak(Box::new(Node {
             fail: None,
             children: HashMap::new(),
             val: Some(val),
             key_word_len: Vec::new(),
-        })).into()
+        }))
+        .into()
     }
 }
 impl Default for Trie {
@@ -71,7 +72,7 @@ impl Trie {
     /// Add keywords from file
     ///
     /// # Examples
-    /// 
+    ///
     ///
     /// ```
     /// use word_sensitive::trie;
@@ -83,13 +84,15 @@ impl Trie {
     /// assert_eq!(matches[1], "回民吃猪肉".as_bytes().as_ref());
     /// ```
     pub fn add_key_word_from_file(&mut self, file: &str) -> std::io::Result<()> {
-      let mut file = File::open(file)?;
-      let mut contents = String::new();
-      file.read_to_string(&mut contents)?;
-      contents.split('\n').for_each(|x| self.add_key_word(x.as_bytes().to_vec()));
-      Ok(())
+        let mut file = File::open(file)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        contents
+            .split('\n')
+            .for_each(|x| self.add_key_word(x.as_bytes().to_vec()));
+        Ok(())
     }
-    /// Add keyword 
+    /// Add keyword
     ///
     /// # Examples
     ///
@@ -105,26 +108,26 @@ impl Trie {
     /// assert_eq!(matches[1], "bcd".as_bytes().as_ref());
     /// ```
     pub fn add_key_word(&mut self, key_word: Vec<Value>) {
-        if key_word.is_empty(){
+        if key_word.is_empty() {
             return;
         }
         let mut cur = self.root;
         for (_, val) in key_word.iter().enumerate() {
-            unsafe{
-            let temp = (*cur.as_ptr())
-                .children
-                .entry(*val)
-                .or_insert_with(|| Node::new(*val));
-            cur = *temp;
+            unsafe {
+                let temp = (*cur.as_ptr())
+                    .children
+                    .entry(*val)
+                    .or_insert_with(|| Node::new(*val));
+                cur = *temp;
             }
         }
         // Append key_word_len
-        unsafe{
-        let c = (*cur.as_ptr()).key_word_len.clone();
-         let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
-         if temp.is_empty(){
-            (*cur.as_ptr()).key_word_len.push(key_word.len());
-         }
+        unsafe {
+            let c = (*cur.as_ptr()).key_word_len.clone();
+            let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
+            if temp.is_empty() {
+                (*cur.as_ptr()).key_word_len.push(key_word.len());
+            }
         }
     }
     /// Build fail pointer for tree
@@ -147,50 +150,45 @@ impl Trie {
     pub fn build(&mut self) {
         let mut queue = VecDeque::new();
         // First level all child fail poiter is root
-        unsafe{
-        let first_level_fail = self.root;
-        for (_i, child) in (*self.root.as_ptr()).children.iter() {
-            (*child.as_ptr()).fail = Some(first_level_fail);
-            queue.push_back(child);
-        }
-        while let Some(node) = queue.pop_front() {
-            let cur = node;
-            // Find fail for all children
-            for (i, child) in (*cur.as_ptr()).children.iter() {
-                // Father fail
-                let mut fafail = (*cur.as_ptr()).fail;
-                // Find father fail until fafail is none or fafail.children[i] is not none
-                while fafail.is_some()
-                    && (*fafail
-                        .unwrap().as_ptr())
-                        .children
-                        .get(&i)
-                        .is_none()
-                {
-                    fafail = (*fafail.unwrap().as_ptr()).fail;
-                }
-                let temp = match fafail {
-                    // Fafail is none ,we knonw fafail is root
-                    None => Some(self.root),
-                    // Else fafail.children[i] will be child fail poiter
-                    Some(v) => {
-                        let children_i = (*v.as_ptr()).children.get(&i).unwrap();
-                        (*children_i.as_ptr()).key_word_len.iter().for_each(|&x| {
-                            (*child.as_ptr()).key_word_len.push(x);
-                        });
-                        // Append key_word_len for other key_word
-                        Some(*(*v.as_ptr()).children.get(&i).unwrap())
+        unsafe {
+            let first_level_fail = self.root;
+            for (_i, child) in (*self.root.as_ptr()).children.iter() {
+                (*child.as_ptr()).fail = Some(first_level_fail);
+                queue.push_back(child);
+            }
+            while let Some(node) = queue.pop_front() {
+                let cur = node;
+                // Find fail for all children
+                for (i, child) in (*cur.as_ptr()).children.iter() {
+                    // Father fail
+                    let mut fafail = (*cur.as_ptr()).fail;
+                    // Find father fail until fafail is none or fafail.children[i] is not none
+                    while fafail.is_some() && (*fafail.unwrap().as_ptr()).children.get(&i).is_none()
+                    {
+                        fafail = (*fafail.unwrap().as_ptr()).fail;
                     }
-                };
-                (*child.as_ptr()).fail = temp;
-                queue.push_back(child)
+                    let temp = match fafail {
+                        // Fafail is none ,we knonw fafail is root
+                        None => Some(self.root),
+                        // Else fafail.children[i] will be child fail poiter
+                        Some(v) => {
+                            let children_i = (*v.as_ptr()).children.get(&i).unwrap();
+                            (*children_i.as_ptr()).key_word_len.iter().for_each(|&x| {
+                                (*child.as_ptr()).key_word_len.push(x);
+                            });
+                            // Append key_word_len for other key_word
+                            Some(*(*v.as_ptr()).children.get(&i).unwrap())
+                        }
+                    };
+                    (*child.as_ptr()).fail = temp;
+                    queue.push_back(child)
+                }
             }
         }
     }
-    }
     /// Query all key_words input text string
-    /// 
-    /// # Examples 
+    ///
+    /// # Examples
     ///
     ///
     /// ```
@@ -238,35 +236,35 @@ impl Trie {
         let mut result: Vec<&[Value]> = Vec::new();
         let mut cur = Some(self.root);
         for (i, e) in text.iter().enumerate() {
-            unsafe{
-            if let Some(v) = cur {
-                // Find  child, child is none, let fail.children[e]
-                // until fail.children[e] is not none or fail equal none
-                let mut child = v;
-                while (*child.as_ptr()).children.get(e).is_none() {
-                    if (*child.as_ptr()).fail.is_none() {
-                        child = self.root;
-                        break;
+            unsafe {
+                if let Some(v) = cur {
+                    // Find  child, child is none, let fail.children[e]
+                    // until fail.children[e] is not none or fail equal none
+                    let mut child = v;
+                    while (*child.as_ptr()).children.get(e).is_none() {
+                        if (*child.as_ptr()).fail.is_none() {
+                            child = self.root;
+                            break;
+                        }
+                        child = (*child.as_ptr()).fail.unwrap();
                     }
-                    child = (*child.as_ptr()).fail.unwrap();
-                }
-                cur = match (*child.as_ptr()).children.get(e) {
-                    None => Some(self.root),
-                    Some(child) => {
-                        result.append(
-                            &mut (*child.as_ptr())
-                                .key_word_len
-                                .iter()
-                                .map(|x| &text[i + 1 - x..i + 1])
-                                .collect(),
-                        );
-                        Some(*child)
+                    cur = match (*child.as_ptr()).children.get(e) {
+                        None => Some(self.root),
+                        Some(child) => {
+                            result.append(
+                                &mut (*child.as_ptr())
+                                    .key_word_len
+                                    .iter()
+                                    .map(|x| &text[i + 1 - x..i + 1])
+                                    .collect(),
+                            );
+                            Some(*child)
+                        }
                     }
+                } else {
+                    cur = Some(self.root);
                 }
-            } else {
-                cur = Some(self.root);
             }
-        }
         }
         result
     }
