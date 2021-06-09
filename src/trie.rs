@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
+use std::marker::PhantomData;
 type Value = u8;
 type NodePtr = NonNull<Node>;
 #[derive(Debug)]
@@ -39,6 +40,7 @@ pub struct Node {
 }
 pub struct Trie {
     pub root: NodePtr,
+    marker: PhantomData<Box<Node>>
 }
 impl Default for Node {
     fn default() -> Self {
@@ -65,6 +67,7 @@ impl Default for Trie {
     fn default() -> Self {
         Trie {
             root: Box::leak(Box::new(Node::default())).into(),
+            marker: PhantomData
         }
     }
 }
@@ -272,7 +275,3 @@ impl Trie {
 unsafe impl Send for Trie {}
 
 unsafe impl Sync for Trie {}
-
-unsafe impl Send for Node {}
-
-unsafe impl Sync for Node {}

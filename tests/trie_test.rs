@@ -1,3 +1,7 @@
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::thread;
+
 use word_sensitive::trie;
 ///-------------------------------------------------------------------
 /// @author yangcancai
@@ -343,4 +347,20 @@ fn specail_build() {
     assert_eq!(r[10], "aca".as_bytes().as_ref());
     assert_eq!(r[11], "cab".as_bytes().as_ref());
     assert_eq!(r[12], "abc".as_bytes().as_ref());
+}
+#[test]
+fn thread_safe(){
+    let mut tree = trie::Trie::default();
+    tree.add_key_word("abc".as_bytes().to_vec());
+    let mm = Arc::new(RwLock::new(tree));
+    let clone = Arc::clone(&mm);
+    let thread = thread::spawn(move || {
+        let r = clone.read().unwrap().query("abcbc".as_bytes().as_ref());
+        assert_eq!(r[0], "abc".as_bytes().as_ref());
+        clone.write().unwrap().add_key_word("bc".as_bytes().to_vec());
+    });
+    thread.join().unwrap();
+     let r = mm.read().unwrap().query("abcbc".as_bytes().as_ref());
+     assert_eq!(r[0], "abc".as_bytes().as_ref());
+     assert_eq!(r[1], "bc".as_bytes().as_ref());
 }
