@@ -27,28 +27,29 @@ use word_sensitive::trie;
 fn add() {
     let mut tree = Trie::default();
     tree.add_key_word(vec![0]);
-    if tree.root.borrow().val != None {
+    unsafe{
+    if (*tree.root.as_ptr()).val != None {
         assert_eq!(true, false);
     }
-    assert_eq!(tree.root.borrow().children[&0].borrow().val, Some(0));
-    assert_eq!(tree.root.borrow().children[&0].borrow().children.len(), 0);
+    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).val, Some(0));
+    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).children.len(), 0);
     tree.add_key_word(vec![0, 1]);
     tree.build();
-    let node = tree.root.borrow_mut();
-    assert_eq!(node.children[&0].borrow().val, Some(0));
-    assert_eq!(node.children[&0].borrow().children.len(), 1);
+    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).val, Some(0));
+    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).children.len(), 1);
     assert_eq!(
-        node.children[&0].borrow().children[&1].borrow().val,
+        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).val,
         Some(1)
     );
-    assert_eq!(node.key_word_len, Vec::new());
-    assert_eq!(node.children[&0].borrow().key_word_len, vec![1]);
+    assert_eq!((*tree.root.as_ptr()).key_word_len, Vec::new());
+    assert_eq!((*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len, vec![1]);
     assert_eq!(
-        node.children[&0].borrow().children[&1]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
+            .as_ptr())
             .key_word_len,
         vec![2]
     );
+}
 }
 #[test]
 fn query() {
@@ -57,59 +58,60 @@ fn query() {
     tree.add_key_word(vec![1, 2]);
     tree.add_key_word(vec![1, 2, 3]);
     tree.add_key_word(vec![3, 4, 5]);
+    unsafe{
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().key_word_len,
+        (*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
+            .as_ptr())
             .key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
+            .as_ptr())
             .children[&2]
-            .borrow()
+            .as_ptr())
             .key_word_len,
         vec![3]
     );
 
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().key_word_len,
+        (*(*tree.root.as_ptr()).children[&1].as_ptr()).key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
+            .as_ptr())
             .key_word_len,
         vec![2]
     );
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
+            .as_ptr())
             .children[&3]
-            .borrow()
+            .as_ptr())
             .key_word_len,
         vec![3]
     );
 
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().key_word_len,
+        (*(*tree.root.as_ptr()).children[&3].as_ptr()).key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
+            .as_ptr())
             .key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
+            .as_ptr())
             .children[&5]
-            .borrow()
+            .as_ptr())
             .key_word_len,
         vec![3]
     );
@@ -117,161 +119,153 @@ fn query() {
     tree.build();
     // key_word_len
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().key_word_len,
+        (*(*tree.root.as_ptr()).children[&0].as_ptr()).key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
+            .as_ptr())
             .key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
+            .as_ptr())
             .children[&2]
-            .borrow()
+            .as_ptr())
             .key_word_len,
         vec![3, 2]
     );
 
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().key_word_len,
+        (*(*tree.root.as_ptr()).children[&1].as_ptr()).key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
+            .as_ptr())
             .key_word_len,
         vec![2]
     );
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
+            .as_ptr())
             .children[&3]
-            .borrow()
+            .as_ptr())
             .key_word_len,
         vec![3]
     );
 
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().key_word_len,
+        (*(*tree.root.as_ptr()).children[&3].as_ptr()).key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
+            .as_ptr())
             .key_word_len,
         vec![]
     );
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
+            .as_ptr())
             .children[&5]
-            .borrow()
+            .as_ptr())
             .key_word_len,
         vec![3]
     );
 
     // fail
     assert_eq!(
-        tree.root.borrow().children[&0]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&0]
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         None
     );
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         Some(1)
     );
     assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
+        (*(*(*(*(*tree.root.as_ptr()).children[&0].as_ptr()).children[&1]
+            .as_ptr())
             .children[&2]
-            .borrow()
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         Some(2)
     );
 
     assert_eq!(
-        tree.root.borrow().children[&1]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&1]
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         None
     );
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         None
     );
     assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
+        (*(*(*(*(*tree.root.as_ptr()).children[&1].as_ptr()).children[&2]
+            .as_ptr())
             .children[&3]
-            .borrow()
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         Some(3)
     );
 
     assert_eq!(
-        tree.root.borrow().children[&3]
-            .borrow()
+        (*(*(*tree.root.as_ptr()).children[&3]
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         None
     );
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
+        (*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         None
     );
     assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
+        (*(*(*(*(*tree.root.as_ptr()).children[&3].as_ptr()).children[&4]
+            .as_ptr())
             .children[&5]
-            .borrow()
+            .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
         None
     );
+}
 
     let r = tree.query(&[1, 2, 3]);
     assert_eq!(r[0], &[1, 2]);

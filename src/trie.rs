@@ -19,20 +19,17 @@
 // @end
 // Created : 2021-06-03T03:59:08+00:00
 //-------------------------------------------------------------------
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
-use std::sync::Weak;
-use std::sync::Arc;
+use core::ptr::NonNull;
 type Value = u8;
-type NodePtr = Arc<RefCell<Node>>;
-type WeakPtr = Weak<RefCell<Node>>;
+type NodePtr = NonNull<Node>;
 #[derive(Debug)]
 pub struct Node {
     // fail pointer
-    pub fail: WeakPtr,
+    pub fail: Option<NodePtr>,
     // all children node
     pub children: HashMap<Value, NodePtr>,
     // current node value
@@ -44,9 +41,9 @@ pub struct Trie {
     pub root: NodePtr,
 }
 impl Default for Node {
-    fn default() -> Self {
+    fn default() -> Self{
         Node {
-            fail: Weak::new(),
+            fail: None,
             children: HashMap::new(),
             val: None,
             key_word_len: Vec::new(),
@@ -54,19 +51,19 @@ impl Default for Node {
     }
 }
 impl Node {
-    pub fn new(val: Value) -> NodePtr {
-        Arc::new(RefCell::new(Node {
-            fail: Weak::new(),
+    pub fn new(val: Value) -> NodePtr{
+        Box::leak(Box::new(Node {
+            fail: None,
             children: HashMap::new(),
             val: Some(val),
             key_word_len: Vec::new(),
-        }))
+        })).into()
     }
 }
 impl Default for Trie {
     fn default() -> Self {
         Trie {
-            root: Arc::new(RefCell::new(Node::default())),
+            root: Box::leak(Box::new(Node::default())).into(),
         }
     }
 }
@@ -108,21 +105,26 @@ impl Trie {
     /// assert_eq!(matches[1], "bcd".as_bytes().as_ref());
     /// ```
     pub fn add_key_word(&mut self, key_word: Vec<Value>) {
-        let mut cur = self.root.clone();
+        if key_word.is_empty(){
+            return;
+        }
+        let mut cur = self.root;
         for (_, val) in key_word.iter().enumerate() {
-            let temp = cur
-                .borrow_mut()
+            unsafe{
+            let temp = (*cur.as_ptr())
                 .children
                 .entry(*val)
-                .or_insert_with(|| Node::new(*val))
-                .clone();
-            cur = temp;
+                .or_insert_with(|| Node::new(*val));
+            cur = *temp;
+            }
         }
         // Append key_word_len
-        let c = cur.borrow().key_word_len.clone();
-        let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
-        if temp.is_empty() {
-            cur.borrow_mut().key_word_len.push(key_word.len());
+        unsafe{
+        let c = (*cur.as_ptr()).key_word_len.clone();
+         let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
+         if temp.is_empty(){
+            (*cur.as_ptr()).key_word_len.push(key_word.len());
+         }
         }
     }
     /// Build fail pointer for tree
@@ -145,46 +147,46 @@ impl Trie {
     pub fn build(&mut self) {
         let mut queue = VecDeque::new();
         // First level all child fail poiter is root
-        let first_level_fail = self.root.clone();
-        for (_i, child) in self.root.borrow().children.iter() {
-            child.borrow_mut().fail = Arc::downgrade(&first_level_fail.clone());
-            queue.push_back(child.clone());
+        unsafe{
+        let first_level_fail = self.root;
+        for (_i, child) in (*self.root.as_ptr()).children.iter() {
+            (*child.as_ptr()).fail = Some(first_level_fail);
+            queue.push_back(child);
         }
         while let Some(node) = queue.pop_front() {
-            let cur = node.borrow();
+            let cur = node;
             // Find fail for all children
-            for (i, child) in cur.children.iter() {
+            for (i, child) in (*cur.as_ptr()).children.iter() {
                 // Father fail
-                let mut fafail = cur.fail.clone();
+                let mut fafail = (*cur.as_ptr()).fail;
                 // Find father fail until fafail is none or fafail.children[i] is not none
-                while fafail.upgrade().is_some()
-                    && fafail
-                        .upgrade()
-                        .unwrap()
-                        .borrow()
+                while fafail.is_some()
+                    && (*fafail
+                        .unwrap().as_ptr())
                         .children
                         .get(&i)
                         .is_none()
                 {
-                    fafail = fafail.upgrade().unwrap().borrow().fail.clone();
+                    fafail = (*fafail.unwrap().as_ptr()).fail;
                 }
-                let temp = match fafail.upgrade() {
+                let temp = match fafail {
                     // Fafail is none ,we knonw fafail is root
-                    None => Arc::downgrade(&self.root.clone()),
+                    None => Some(self.root),
                     // Else fafail.children[i] will be child fail poiter
                     Some(v) => {
-                        let children_i = v.borrow().children.get(&i).unwrap().clone();
-                        children_i.borrow().key_word_len.iter().for_each(|&x| {
-                            child.borrow_mut().key_word_len.push(x);
+                        let children_i = (*v.as_ptr()).children.get(&i).unwrap();
+                        (*children_i.as_ptr()).key_word_len.iter().for_each(|&x| {
+                            (*child.as_ptr()).key_word_len.push(x);
                         });
                         // Append key_word_len for other key_word
-                        Arc::downgrade(&v.borrow().children.get(&i).unwrap().clone())
+                        Some(*(*v.as_ptr()).children.get(&i).unwrap())
                     }
                 };
-                child.borrow_mut().fail = temp;
-                queue.push_back(child.clone())
+                (*child.as_ptr()).fail = temp;
+                queue.push_back(child)
             }
         }
+    }
     }
     /// Query all key_words input text string
     /// 
@@ -234,36 +236,37 @@ impl Trie {
     /// ```
     pub fn query<'a>(&self, text: &'a [Value]) -> Vec<&'a [Value]> {
         let mut result: Vec<&[Value]> = Vec::new();
-        let mut cur = Arc::downgrade(&self.root);
+        let mut cur = Some(self.root);
         for (i, e) in text.iter().enumerate() {
-            if let Some(v) = cur.upgrade() {
+            unsafe{
+            if let Some(v) = cur {
                 // Find  child, child is none, let fail.children[e]
                 // until fail.children[e] is not none or fail equal none
-                let mut child = Arc::downgrade(&v.clone());
-                while child.upgrade().unwrap().borrow().children.get(e).is_none() {
-                    if child.upgrade().unwrap().borrow().fail.upgrade().is_none() {
-                        child = Arc::downgrade(&self.root.clone());
+                let mut child = v;
+                while (*child.as_ptr()).children.get(e).is_none() {
+                    if (*child.as_ptr()).fail.is_none() {
+                        child = self.root;
                         break;
                     }
-                    child = child.upgrade().unwrap().borrow().fail.clone();
+                    child = (*child.as_ptr()).fail.unwrap();
                 }
-                cur = match child.upgrade().unwrap().borrow().children.get(e) {
-                    None => Arc::downgrade(&self.root),
+                cur = match (*child.as_ptr()).children.get(e) {
+                    None => Some(self.root),
                     Some(child) => {
                         result.append(
-                            &mut child
-                                .borrow()
+                            &mut (*child.as_ptr())
                                 .key_word_len
                                 .iter()
                                 .map(|x| &text[i + 1 - x..i + 1])
                                 .collect(),
                         );
-                        Arc::downgrade(&child)
+                        Some(*child)
                     }
                 }
             } else {
-                cur = Arc::downgrade(&self.root);
+                cur = Some(self.root);
             }
+        }
         }
         result
     }
