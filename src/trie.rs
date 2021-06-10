@@ -59,7 +59,7 @@ pub struct Node<T> {
     pub ext: Vec<T>,
 }
 pub struct Trie<T> {
-    pub root: NodePtr<T>,
+    pub root: Option<NodePtr<T>>,
     marker: PhantomData<Box<Node<T>>>,
 }
 impl<T> Default for Node<T> {
@@ -95,7 +95,7 @@ impl<T: NodeExt> Node<T> {
 impl<T> Default for Trie<T> {
     fn default() -> Self {
         Trie {
-            root: Box::leak(Box::new(Node::default())).into(),
+            root: Some(Box::leak(Box::new(Node::default())).into()),
             marker: PhantomData,
         }
     }
@@ -149,7 +149,7 @@ impl<T: NodeExt + Clone> Trie<T> {
         if key_word.is_empty() {
             return;
         }
-        let mut cur = self.root;
+        let mut cur = self.root.unwrap();
         for (_, val) in key_word.iter().enumerate() {
             unsafe {
                 let temp = (*cur.as_ptr())
@@ -185,8 +185,8 @@ impl<T: NodeExt + Clone> Trie<T> {
         let mut queue = VecDeque::new();
         // First level all child fail poiter is root
         unsafe {
-            let first_level_fail = self.root;
-            for (_i, child) in (*self.root.as_ptr()).children.iter() {
+            let first_level_fail = self.root.unwrap();
+            for (_i, child) in (*self.root.unwrap().as_ptr()).children.iter() {
                 (*child.as_ptr()).fail = Some(first_level_fail);
                 queue.push_back(child);
             }
@@ -203,7 +203,7 @@ impl<T: NodeExt + Clone> Trie<T> {
                     }
                     let temp = match fafail {
                         // Fafail is none ,we knonw fafail is root
-                        None => Some(self.root),
+                        None => self.root,
                         // Else fafail.children[i] will be child fail poiter
                         Some(v) => {
                             let children_i = (*v.as_ptr()).children.get(&i).unwrap();
@@ -305,7 +305,7 @@ impl<T: NodeExt + Clone> Trie<T> {
     /// fn get_cate(&self) -> usize {
     ///     self.cate
     /// }
-    /// } 
+    /// }
     /// let mut tree = trie::Trie::default();
     /// tree.add_key_word_ext(
     ///     "abc".as_bytes().to_vec(),
@@ -429,7 +429,7 @@ impl<T: NodeExt + Clone> Trie<T> {
     }
     pub fn query_ext<'a>(&self, text: &'a [Value]) -> Vec<(usize, &T)> {
         let mut result = Vec::new();
-        let mut cur = Some(self.root);
+        let mut cur = self.root;
         for (i, e) in text.iter().enumerate() {
             unsafe {
                 if let Some(v) = cur {
@@ -438,13 +438,13 @@ impl<T: NodeExt + Clone> Trie<T> {
                     let mut child = v;
                     while (*child.as_ptr()).children.get(e).is_none() {
                         if (*child.as_ptr()).fail.is_none() {
-                            child = self.root;
+                            child = self.root.unwrap();
                             break;
                         }
                         child = (*child.as_ptr()).fail.unwrap();
                     }
                     cur = match (*child.as_ptr()).children.get(e) {
-                        None => Some(self.root),
+                        None => self.root,
                         Some(child) => {
                             result.append(
                                 &mut (*child.as_ptr()).ext.iter().map(|x| (i + 1, x)).collect(),
@@ -453,11 +453,35 @@ impl<T: NodeExt + Clone> Trie<T> {
                         }
                     }
                 } else {
-                    cur = Some(self.root);
+                    cur = self.root;
                 }
             }
         }
         result
+    }
+}
+
+impl<T> Drop for Trie<T> {
+    fn drop(&mut self) {
+        let mut queue = VecDeque::new();
+        let mut queue_drop = VecDeque::new();
+        unsafe {
+            let node = self.root.unwrap();
+            queue.push_back(&node);
+            queue_drop.push_back(&node);
+            while let Some(node) = queue.pop_front() {
+                // Find all children
+                for (_i, child) in (*node.as_ptr()).children.iter() {
+                    queue_drop.push_back(child);
+                    queue.push_back(child)
+                }
+            }
+            while let Some(node) = queue_drop.pop_back() {
+                let mm = Box::from_raw(node.as_ptr());
+                drop(mm);
+            }
+        }
+        self.root = None;
     }
 }
 unsafe impl<T> Send for Trie<T> {}
