@@ -26,52 +26,81 @@ use std::fs::File;
 use std::io::Read;
 use std::marker::PhantomData;
 type Value = u8;
-type NodePtr = NonNull<Node>;
+type NodePtr<T> = NonNull<Node<T>>;
+pub trait NodeExt {
+    fn get_len(&self) -> usize;
+    fn eq(&self, other: &Self) -> bool;
+    fn get_weight(&self) -> usize;
+    fn get_cate(&self) -> usize;
+}
+impl NodeExt for usize {
+    fn get_len(&self) -> usize {
+        *self
+    }
+    fn eq(&self, other: &usize) -> bool {
+        *self == *other
+    }
+    fn get_weight(&self) -> usize {
+        1
+    }
+    fn get_cate(&self) -> usize {
+        1
+    }
+}
 #[derive(Debug)]
-pub struct Node {
+pub struct Node<T> {
     // fail pointer
-    pub fail: Option<NodePtr>,
+    pub fail: Option<NodePtr<T>>,
     // all children node
-    pub children: HashMap<Value, NodePtr>,
+    pub children: HashMap<Value, NodePtr<T>>,
     // current node value
     pub val: Option<Value>,
     // all path
-    pub key_word_len: Vec<usize>,
+    pub ext: Vec<T>,
 }
-pub struct Trie {
-    pub root: NodePtr,
-    marker: PhantomData<Box<Node>>
+pub struct Trie<T> {
+    pub root: NodePtr<T>,
+    marker: PhantomData<Box<Node<T>>>,
 }
-impl Default for Node {
+impl<T> Default for Node<T> {
     fn default() -> Self {
         Node {
             fail: None,
             children: HashMap::new(),
             val: None,
-            key_word_len: Vec::new(),
+            ext: Vec::new(),
         }
     }
 }
-impl Node {
-    pub fn new(val: Value) -> NodePtr {
+impl<T: NodeExt> Node<T> {
+    pub fn new(val: Value) -> NodePtr<T> {
         Box::leak(Box::new(Node {
             fail: None,
             children: HashMap::new(),
             val: Some(val),
-            key_word_len: Vec::new(),
+            ext: Vec::<T>::new(),
         }))
         .into()
     }
+    pub fn push(&mut self, element: T) {
+        for e in self.ext.iter_mut() {
+            if e.eq(&element) {
+                *e = element;
+                return;
+            }
+        }
+        self.ext.push(element);
+    }
 }
-impl Default for Trie {
+impl<T> Default for Trie<T> {
     fn default() -> Self {
         Trie {
             root: Box::leak(Box::new(Node::default())).into(),
-            marker: PhantomData
+            marker: PhantomData,
         }
     }
 }
-impl Trie {
+impl Trie<usize> {
     /// Add keywords from file
     ///
     /// # Examples
@@ -111,6 +140,12 @@ impl Trie {
     /// assert_eq!(matches[1], "bcd".as_bytes().as_ref());
     /// ```
     pub fn add_key_word(&mut self, key_word: Vec<Value>) {
+        let len = key_word.len();
+        self.add_key_word_ext(key_word, len)
+    }
+}
+impl<T: NodeExt + Clone> Trie<T> {
+    pub fn add_key_word_ext(&mut self, key_word: Vec<Value>, ext: T) {
         if key_word.is_empty() {
             return;
         }
@@ -120,17 +155,13 @@ impl Trie {
                 let temp = (*cur.as_ptr())
                     .children
                     .entry(*val)
-                    .or_insert_with(|| Node::new(*val));
+                    .or_insert_with(|| Node::<T>::new(*val));
                 cur = *temp;
             }
         }
         // Append key_word_len
         unsafe {
-            let c = (*cur.as_ptr()).key_word_len.clone();
-            let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
-            if temp.is_empty() {
-                (*cur.as_ptr()).key_word_len.push(key_word.len());
-            }
+            (*cur.as_ptr()).push(ext);
         }
     }
     /// Build fail pointer for tree
@@ -176,11 +207,8 @@ impl Trie {
                         // Else fafail.children[i] will be child fail poiter
                         Some(v) => {
                             let children_i = (*v.as_ptr()).children.get(&i).unwrap();
-                            (*children_i.as_ptr()).key_word_len.iter().for_each(|&x| {
-                               let temp: Vec<&usize> = (*child.as_ptr()).key_word_len.iter().filter(|&y| *y == x).collect();
-                               if temp.is_empty(){
-                                    (*child.as_ptr()).key_word_len.push(x);
-                               }
+                            (*children_i.as_ptr()).ext.iter().for_each(|x| {
+                                (*child.as_ptr()).push(x.clone());
                             });
                             // Append key_word_len for other key_word
                             Some(*(*v.as_ptr()).children.get(&i).unwrap())
@@ -239,7 +267,168 @@ impl Trie {
     /// assert_eq!(matches[7], "cca".as_bytes().as_ref());
     /// ```
     pub fn query<'a>(&self, text: &'a [Value]) -> Vec<&'a [Value]> {
-        let mut result: Vec<&[Value]> = Vec::new();
+        self.query_ext(text)
+            .iter()
+            .map(|(i, x)| &text[*i - x.get_len()..*i])
+            .collect()
+    }
+    /// Query total weight for text
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word("abc".as_bytes().to_vec());
+    /// tree.add_key_word("bc".as_bytes().to_vec());
+    /// tree.build();
+    /// assert_eq!(2, tree.query_total_weight("abc".as_bytes().as_ref()));
+    ///
+    ///
+    /// #[derive(Clone)]
+    /// struct Ext {
+    /// cate: usize,
+    /// weight: usize,
+    /// len: usize,
+    /// }
+    /// impl trie::NodeExt for Ext {
+    /// fn get_len(&self) -> usize {
+    ///     self.len
+    /// }
+    /// fn eq(&self, other: &Self) -> bool {
+    ///     self.len == other.len
+    /// }
+    /// fn get_weight(&self) -> usize {
+    ///     self.weight
+    /// }
+    /// fn get_cate(&self) -> usize {
+    ///     self.cate
+    /// }
+    /// } 
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word_ext(
+    ///     "abc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 2,
+    ///         len: 3,
+    ///     },
+    /// );
+    /// tree.add_key_word_ext(
+    ///     "bc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// assert_eq!(3, tree.query_total_weight("abc".as_bytes().as_ref()));
+    /// ```
+    pub fn query_total_weight(&self, text: &[Value]) -> usize {
+        self.query_ext(text)
+            .iter()
+            .fold(0usize, |acc, (_, x)| acc + x.get_weight())
+    }
+    /// Query Category weight for text
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word("abc".as_bytes().to_vec());
+    /// tree.add_key_word("bc".as_bytes().to_vec());
+    /// tree.build();
+    /// assert_eq!(
+    ///     Some(&2),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    /// );
+    /// #[derive(Clone)]
+    /// struct Ext {
+    /// cate: usize,
+    /// weight: usize,
+    /// len: usize,
+    /// }
+    /// impl trie::NodeExt for Ext {
+    /// fn get_len(&self) -> usize {
+    ///     self.len
+    /// }
+    /// fn eq(&self, other: &Self) -> bool {
+    ///     self.len == other.len
+    /// }
+    /// fn get_weight(&self) -> usize {
+    ///     self.weight
+    /// }
+    /// fn get_cate(&self) -> usize {
+    ///     self.cate
+    /// }
+    /// }
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word_ext(
+    ///     "abc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 2,
+    ///         len: 3,
+    ///     },
+    /// );
+    /// tree.add_key_word_ext(
+    ///     "bc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// assert_eq!(
+    ///     Some(&3),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    /// );
+
+    /// tree.add_key_word_ext(
+    ///     "bc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 2,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// tree.add_key_word_ext(
+    ///     "ab".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 2,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// assert_eq!(
+    ///     Some(&2),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    /// );
+    /// assert_eq!(
+    ///     Some(&2),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&2)
+    /// );
+
+    /// ```
+    pub fn query_cate_weight(&self, text: &[Value]) -> HashMap<usize, usize> {
+        let mut result = HashMap::new();
+        self.query_ext(text).iter().for_each(|(_i, x)| {
+            if let Some(e) = result.get_mut(&x.get_cate()) {
+                *e += x.get_weight();
+            } else {
+                result.insert(x.get_cate(), x.get_weight());
+            }
+        });
+        result
+    }
+    pub fn query_ext<'a>(&self, text: &'a [Value]) -> Vec<(usize, &T)> {
+        let mut result = Vec::new();
         let mut cur = Some(self.root);
         for (i, e) in text.iter().enumerate() {
             unsafe {
@@ -258,11 +447,7 @@ impl Trie {
                         None => Some(self.root),
                         Some(child) => {
                             result.append(
-                                &mut (*child.as_ptr())
-                                    .key_word_len
-                                    .iter()
-                                    .map(|x| &text[i + 1 - x..i + 1])
-                                    .collect(),
+                                &mut (*child.as_ptr()).ext.iter().map(|x| (i + 1, x)).collect(),
                             );
                             Some(*child)
                         }
@@ -275,6 +460,6 @@ impl Trie {
         result
     }
 }
-unsafe impl Send for Trie {}
+unsafe impl<T> Send for Trie<T> {}
 
-unsafe impl Sync for Trie {}
+unsafe impl<T> Sync for Trie<T> {}
