@@ -1,4 +1,5 @@
 use word_sensitive::Trie;
+use word_sensitive::trie::NodeExt;
 fn main() {
     let mut tree = Trie::<usize>::default();
     tree.add_key_word("aaa".as_bytes().to_vec());
@@ -40,5 +41,34 @@ fn main() {
     tree.add_key_word("ccb".as_bytes().to_vec());
     tree.add_key_word("ccc".as_bytes().to_vec());
     tree.build();
+    let mut tree = Trie::default();
+
+    #[derive(Clone)]
+    struct Ext{
+        cate: usize,
+        len: usize,
+        weight: usize
+    }
+    impl NodeExt for Ext{
+        fn get_len(&self) -> usize{
+            self.len
+        }
+        fn get_weight(&self) -> usize {
+            self.weight
+        }
+        fn get_cate(&self) -> usize{
+            self.cate
+        }
+        fn eq(&self, other: &Self) -> bool{
+            self.len == other.len
+        }
+    }
+    tree.add_key_word_ext("abc".as_bytes().to_vec(), Ext{cate:1, len: 3, weight: 1});
+    tree.add_key_word_ext("bc".as_bytes().to_vec(), Ext{cate:2, len: 2, weight: 10});
+    tree.build();
+    let r = tree.query_cate_weight("abc".as_bytes().as_ref());
+    assert_eq!(r[&1], 1);
+    assert_eq!(r[&2], 10);
+    assert_eq!(tree.query_total_weight("abc".as_bytes().as_ref()), 11);
     println!("Hello, world!");
 }
