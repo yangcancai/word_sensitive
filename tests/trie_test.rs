@@ -1,6 +1,5 @@
 ///-------------------------------------------------------------------
 /// @author yangcancai
-
 /// Copyright (c) 2021 by yangcancai(yangcancai0112@gmail.com), All Rights Reserved.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,34 +20,57 @@
 /// @end
 /// Created : 2021-06-03T04:18:52+00:00
 ///-------------------------------------------------------------------
-use word_sensitive::Trie;
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::thread;
+
 use word_sensitive::trie;
+
+use word_sensitive::Trie;
 #[test]
 fn add() {
     let mut tree = Trie::default();
     tree.add_key_word(vec![0]);
-    if tree.root.borrow().val != None {
-        assert_eq!(true, false);
+    unsafe {
+        if (*tree.root.unwrap().as_ptr()).val != None {
+            assert_eq!(true, false);
+        }
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).val,
+            Some(0)
+        );
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr())
+                .children
+                .len(),
+            0
+        );
+        tree.add_key_word(vec![0, 1]);
+        tree.build();
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).val,
+            Some(0)
+        );
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr())
+                .children
+                .len(),
+            1
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).val,
+            Some(1)
+        );
+        assert_eq!((*tree.root.unwrap().as_ptr()).ext, Vec::new());
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).ext,
+            vec![1]
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).ext,
+            vec![2]
+        );
     }
-    assert_eq!(tree.root.borrow().children[&0].borrow().val, Some(0));
-    assert_eq!(tree.root.borrow().children[&0].borrow().children.len(), 0);
-    tree.add_key_word(vec![0, 1]);
-    tree.build();
-    let node = tree.root.borrow_mut();
-    assert_eq!(node.children[&0].borrow().val, Some(0));
-    assert_eq!(node.children[&0].borrow().children.len(), 1);
-    assert_eq!(
-        node.children[&0].borrow().children[&1].borrow().val,
-        Some(1)
-    );
-    assert_eq!(node.key_word_len, Vec::new());
-    assert_eq!(node.children[&0].borrow().key_word_len, vec![1]);
-    assert_eq!(
-        node.children[&0].borrow().children[&1]
-            .borrow()
-            .key_word_len,
-        vec![2]
-    );
 }
 #[test]
 fn query() {
@@ -57,221 +79,187 @@ fn query() {
     tree.add_key_word(vec![1, 2]);
     tree.add_key_word(vec![1, 2, 3]);
     tree.add_key_word(vec![3, 4, 5]);
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
-            .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
-            .children[&2]
-            .borrow()
-            .key_word_len,
-        vec![3]
-    );
+    unsafe {
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr())
+                .children[&2]
+                .as_ptr())
+            .ext,
+            vec![3]
+        );
 
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
-            .key_word_len,
-        vec![2]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
-            .children[&3]
-            .borrow()
-            .key_word_len,
-        vec![3]
-    );
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).children[&2].as_ptr()).ext,
+            vec![2]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).children[&2].as_ptr())
+                .children[&3]
+                .as_ptr())
+            .ext,
+            vec![3]
+        );
 
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
-            .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
-            .children[&5]
-            .borrow()
-            .key_word_len,
-        vec![3]
-    );
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).children[&4].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).children[&4].as_ptr())
+                .children[&5]
+                .as_ptr())
+            .ext,
+            vec![3]
+        );
 
-    tree.build();
-    // key_word_len
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
-            .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
-            .children[&2]
-            .borrow()
-            .key_word_len,
-        vec![3, 2]
-    );
+        tree.build();
+        //.ext
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr())
+                .children[&2]
+                .as_ptr())
+            .ext,
+            vec![3, 2]
+        );
 
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
-            .key_word_len,
-        vec![2]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
-            .children[&3]
-            .borrow()
-            .key_word_len,
-        vec![3]
-    );
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).children[&2].as_ptr()).ext,
+            vec![2]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).children[&2].as_ptr())
+                .children[&3]
+                .as_ptr())
+            .ext,
+            vec![3]
+        );
 
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
-            .key_word_len,
-        vec![]
-    );
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
-            .children[&5]
-            .borrow()
-            .key_word_len,
-        vec![3]
-    );
+        assert_eq!(
+            (*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).children[&4].as_ptr()).ext,
+            vec![]
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).children[&4].as_ptr())
+                .children[&5]
+                .as_ptr())
+            .ext,
+            vec![3]
+        );
 
-    // fail
-    assert_eq!(
-        tree.root.borrow().children[&0]
-            .borrow()
-            .fail
-            .upgrade()
-            .unwrap()
-            .borrow()
+        // fail
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
             .val,
-        None
-    );
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
-            .fail
-            .upgrade()
-            .unwrap()
-            .borrow()
+            None
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
             .val,
-        Some(1)
-    );
-    assert_eq!(
-        tree.root.borrow().children[&0].borrow().children[&1]
-            .borrow()
-            .children[&2]
-            .borrow()
+            Some(1)
+        );
+        assert_eq!(
+            (*(*(*(*(*tree.root.unwrap().as_ptr()).children[&0].as_ptr()).children[&1].as_ptr())
+                .children[&2]
+                .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
-        Some(2)
-    );
+            Some(2)
+        );
 
-    assert_eq!(
-        tree.root.borrow().children[&1]
-            .borrow()
-            .fail
-            .upgrade()
-            .unwrap()
-            .borrow()
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
             .val,
-        None
-    );
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
-            .fail
-            .upgrade()
-            .unwrap()
-            .borrow()
+            None
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).children[&2].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
             .val,
-        None
-    );
-    assert_eq!(
-        tree.root.borrow().children[&1].borrow().children[&2]
-            .borrow()
-            .children[&3]
-            .borrow()
+            None
+        );
+        assert_eq!(
+            (*(*(*(*(*tree.root.unwrap().as_ptr()).children[&1].as_ptr()).children[&2].as_ptr())
+                .children[&3]
+                .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
-        Some(3)
-    );
+            Some(3)
+        );
 
-    assert_eq!(
-        tree.root.borrow().children[&3]
-            .borrow()
-            .fail
-            .upgrade()
-            .unwrap()
-            .borrow()
+        assert_eq!(
+            (*(*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
             .val,
-        None
-    );
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
-            .fail
-            .upgrade()
-            .unwrap()
-            .borrow()
+            None
+        );
+        assert_eq!(
+            (*(*(*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).children[&4].as_ptr())
+                .fail
+                .unwrap()
+                .as_ptr())
             .val,
-        None
-    );
-    assert_eq!(
-        tree.root.borrow().children[&3].borrow().children[&4]
-            .borrow()
-            .children[&5]
-            .borrow()
+            None
+        );
+        assert_eq!(
+            (*(*(*(*(*tree.root.unwrap().as_ptr()).children[&3].as_ptr()).children[&4].as_ptr())
+                .children[&5]
+                .as_ptr())
             .fail
-            .upgrade()
             .unwrap()
-            .borrow()
+            .as_ptr())
             .val,
-        None
-    );
+            None
+        );
+    }
 
     let r = tree.query(&[1, 2, 3]);
     assert_eq!(r[0], &[1, 2]);
@@ -310,7 +298,8 @@ fn query() {
 #[test]
 fn key_words_from_file() {
     let mut tree = trie::Trie::default();
-    tree.add_key_word_from_file("key_words/keywords.txt").unwrap();
+    tree.add_key_word_from_file("key_words/keywords.txt")
+        .unwrap();
     tree.build();
     let r = tree.query("回民吃猪肉".as_bytes().as_ref());
     assert_eq!(r[0], "回民".as_bytes().as_ref());
@@ -322,35 +311,38 @@ fn specail_build() {
     tree.add_key_word("aaa".as_bytes().to_vec());
     tree.add_key_word("aab".as_bytes().to_vec());
     tree.add_key_word("aac".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("aba".as_bytes().to_vec());
     tree.add_key_word("abb".as_bytes().to_vec());
     tree.add_key_word("abc".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("aca".as_bytes().to_vec());
     tree.add_key_word("acb".as_bytes().to_vec());
     tree.add_key_word("acc".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("baa".as_bytes().to_vec());
     tree.add_key_word("bab".as_bytes().to_vec());
     tree.add_key_word("bac".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("bba".as_bytes().to_vec());
     tree.add_key_word("bbb".as_bytes().to_vec());
     tree.add_key_word("bbc".as_bytes().to_vec());
-
+    tree.build();
+    tree.add_key_word("bba".as_bytes().to_vec());
     tree.add_key_word("bca".as_bytes().to_vec());
     tree.add_key_word("bcb".as_bytes().to_vec());
     tree.add_key_word("bcc".as_bytes().to_vec());
-
+    tree.build();
     tree.add_key_word("caa".as_bytes().to_vec());
     tree.add_key_word("cab".as_bytes().to_vec());
     tree.add_key_word("cac".as_bytes().to_vec());
 
+    tree.build();
     tree.add_key_word("cba".as_bytes().to_vec());
     tree.add_key_word("cbb".as_bytes().to_vec());
     tree.add_key_word("cbc".as_bytes().to_vec());
 
+    tree.build();
     tree.add_key_word("cca".as_bytes().to_vec());
     tree.add_key_word("ccb".as_bytes().to_vec());
     tree.add_key_word("ccc".as_bytes().to_vec());
@@ -370,4 +362,139 @@ fn specail_build() {
     assert_eq!(r[10], "aca".as_bytes().as_ref());
     assert_eq!(r[11], "cab".as_bytes().as_ref());
     assert_eq!(r[12], "abc".as_bytes().as_ref());
+}
+#[test]
+fn thread_safe() {
+    let mut tree = trie::Trie::default();
+    tree.add_key_word("abc".as_bytes().to_vec());
+    let mm = Arc::new(RwLock::new(tree));
+    let clone = Arc::clone(&mm);
+    let thread = thread::spawn(move || {
+        let r = clone.read().unwrap().query("abcbc".as_bytes().as_ref());
+        assert_eq!(r[0], "abc".as_bytes().as_ref());
+        clone
+            .write()
+            .unwrap()
+            .add_key_word("bc".as_bytes().to_vec());
+    });
+    thread.join().unwrap();
+    let r = mm.read().unwrap().query("abcbc".as_bytes().as_ref());
+    assert_eq!(r[0], "abc".as_bytes().as_ref());
+    assert_eq!(r[1], "bc".as_bytes().as_ref());
+}
+#[derive(Clone)]
+struct Ext {
+    cate: usize,
+    weight: usize,
+    len: usize,
+}
+impl trie::NodeExt for Ext {
+    fn get_len(&self) -> usize {
+        self.len
+    }
+    fn eq(&self, other: &Self) -> bool {
+        self.len == other.len
+    }
+    fn get_weight(&self) -> usize {
+        self.weight
+    }
+    fn get_cate(&self) -> usize {
+        self.cate
+    }
+}
+#[test]
+fn query_total_weight() {
+    let mut tree = trie::Trie::default();
+    tree.add_key_word("abc".as_bytes().to_vec());
+    tree.add_key_word("bc".as_bytes().to_vec());
+    tree.build();
+    assert_eq!(2, tree.query_total_weight("abc".as_bytes().as_ref()));
+    //
+    let mut tree = trie::Trie::default();
+    tree.add_key_word_ext(
+        "abc".as_bytes().to_vec(),
+        Ext {
+            cate: 1,
+            weight: 2,
+            len: 3,
+        },
+    );
+    tree.add_key_word_ext(
+        "bc".as_bytes().to_vec(),
+        Ext {
+            cate: 1,
+            weight: 1,
+            len: 2,
+        },
+    );
+    tree.build();
+    assert_eq!(3, tree.query_total_weight("abc".as_bytes().as_ref()));
+}
+
+#[test]
+fn query_cate_weight() {
+    let mut tree = trie::Trie::default();
+    tree.add_key_word("abc".as_bytes().to_vec());
+    tree.add_key_word("bc".as_bytes().to_vec());
+    tree.build();
+    assert_eq!(
+        Some(&2),
+        tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    );
+
+    let mut tree = trie::Trie::default();
+    tree.add_key_word_ext(
+        "abc".as_bytes().to_vec(),
+        Ext {
+            cate: 1,
+            weight: 2,
+            len: 3,
+        },
+    );
+    tree.add_key_word_ext(
+        "bc".as_bytes().to_vec(),
+        Ext {
+            cate: 1,
+            weight: 1,
+            len: 2,
+        },
+    );
+    tree.build();
+    assert_eq!(
+        Some(&3),
+        tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    );
+
+    tree.add_key_word_ext(
+        "bc".as_bytes().to_vec(),
+        Ext {
+            cate: 2,
+            weight: 1,
+            len: 2,
+        },
+    );
+    tree.build();
+    tree.add_key_word_ext(
+        "ab".as_bytes().to_vec(),
+        Ext {
+            cate: 2,
+            weight: 1,
+            len: 2,
+        },
+    );
+    tree.build();
+    assert_eq!(
+        Some(&2),
+        tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    );
+    assert_eq!(
+        Some(&2),
+        tree.query_cate_weight("abc".as_bytes().as_ref()).get(&2)
+    );
+}
+#[test]
+fn leak() {
+    let mut tree = trie::Trie::default();
+    tree.add_key_word("abc".as_bytes().to_vec());
+    tree.build();
 }

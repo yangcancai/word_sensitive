@@ -19,62 +19,92 @@
 // @end
 // Created : 2021-06-03T03:59:08+00:00
 //-------------------------------------------------------------------
-use std::cell::RefCell;
+use core::ptr::NonNull;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
-use std::sync::Weak;
-use std::sync::Arc;
+use std::marker::PhantomData;
 type Value = u8;
-type NodePtr = Arc<RefCell<Node>>;
-type WeakPtr = Weak<RefCell<Node>>;
+type NodePtr<T> = NonNull<Node<T>>;
+pub trait NodeExt {
+    fn get_len(&self) -> usize;
+    fn eq(&self, other: &Self) -> bool;
+    fn get_weight(&self) -> usize;
+    fn get_cate(&self) -> usize;
+}
+impl NodeExt for usize {
+    fn get_len(&self) -> usize {
+        *self
+    }
+    fn eq(&self, other: &usize) -> bool {
+        *self == *other
+    }
+    fn get_weight(&self) -> usize {
+        1
+    }
+    fn get_cate(&self) -> usize {
+        1
+    }
+}
 #[derive(Debug)]
-pub struct Node {
+pub struct Node<T> {
     // fail pointer
-    pub fail: WeakPtr,
+    pub fail: Option<NodePtr<T>>,
     // all children node
-    pub children: HashMap<Value, NodePtr>,
+    pub children: HashMap<Value, NodePtr<T>>,
     // current node value
     pub val: Option<Value>,
     // all path
-    pub key_word_len: Vec<usize>,
+    pub ext: Vec<T>,
 }
-pub struct Trie {
-    pub root: NodePtr,
+pub struct Trie<T> {
+    pub root: Option<NodePtr<T>>,
+    marker: PhantomData<Box<Node<T>>>,
 }
-impl Default for Node {
+impl<T> Default for Node<T> {
     fn default() -> Self {
         Node {
-            fail: Weak::new(),
+            fail: None,
             children: HashMap::new(),
             val: None,
-            key_word_len: Vec::new(),
+            ext: Vec::new(),
         }
     }
 }
-impl Node {
-    pub fn new(val: Value) -> NodePtr {
-        Arc::new(RefCell::new(Node {
-            fail: Weak::new(),
+impl<T: NodeExt> Node<T> {
+    pub fn new(val: Value) -> NodePtr<T> {
+        Box::leak(Box::new(Node {
+            fail: None,
             children: HashMap::new(),
             val: Some(val),
-            key_word_len: Vec::new(),
+            ext: Vec::<T>::new(),
         }))
+        .into()
+    }
+    pub fn push(&mut self, element: T) {
+        for e in self.ext.iter_mut() {
+            if e.eq(&element) {
+                *e = element;
+                return;
+            }
+        }
+        self.ext.push(element);
     }
 }
-impl Default for Trie {
+impl<T> Default for Trie<T> {
     fn default() -> Self {
         Trie {
-            root: Arc::new(RefCell::new(Node::default())),
+            root: Some(Box::leak(Box::new(Node::default())).into()),
+            marker: PhantomData,
         }
     }
 }
-impl Trie {
+impl Trie<usize> {
     /// Add keywords from file
     ///
     /// # Examples
-    /// 
+    ///
     ///
     /// ```
     /// use word_sensitive::trie;
@@ -86,13 +116,15 @@ impl Trie {
     /// assert_eq!(matches[1], "回民吃猪肉".as_bytes().as_ref());
     /// ```
     pub fn add_key_word_from_file(&mut self, file: &str) -> std::io::Result<()> {
-      let mut file = File::open(file)?;
-      let mut contents = String::new();
-      file.read_to_string(&mut contents)?;
-      contents.split('\n').for_each(|x| self.add_key_word(x.as_bytes().to_vec()));
-      Ok(())
+        let mut file = File::open(file)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        contents
+            .split('\n')
+            .for_each(|x| self.add_key_word(x.as_bytes().to_vec()));
+        Ok(())
     }
-    /// Add keyword 
+    /// Add keyword
     ///
     /// # Examples
     ///
@@ -108,21 +140,28 @@ impl Trie {
     /// assert_eq!(matches[1], "bcd".as_bytes().as_ref());
     /// ```
     pub fn add_key_word(&mut self, key_word: Vec<Value>) {
-        let mut cur = self.root.clone();
+        let len = key_word.len();
+        self.add_key_word_ext(key_word, len)
+    }
+}
+impl<T: NodeExt + Clone> Trie<T> {
+    pub fn add_key_word_ext(&mut self, key_word: Vec<Value>, ext: T) {
+        if key_word.is_empty() {
+            return;
+        }
+        let mut cur = self.root.unwrap();
         for (_, val) in key_word.iter().enumerate() {
-            let temp = cur
-                .borrow_mut()
-                .children
-                .entry(*val)
-                .or_insert_with(|| Node::new(*val))
-                .clone();
-            cur = temp;
+            unsafe {
+                let temp = (*cur.as_ptr())
+                    .children
+                    .entry(*val)
+                    .or_insert_with(|| Node::<T>::new(*val));
+                cur = *temp;
+            }
         }
         // Append key_word_len
-        let c = cur.borrow().key_word_len.clone();
-        let temp: Vec<&usize> = c.iter().filter(|&x| *x == key_word.len()).collect();
-        if temp.is_empty() {
-            cur.borrow_mut().key_word_len.push(key_word.len());
+        unsafe {
+            (*cur.as_ptr()).push(ext);
         }
     }
     /// Build fail pointer for tree
@@ -145,50 +184,45 @@ impl Trie {
     pub fn build(&mut self) {
         let mut queue = VecDeque::new();
         // First level all child fail poiter is root
-        let first_level_fail = self.root.clone();
-        for (_i, child) in self.root.borrow().children.iter() {
-            child.borrow_mut().fail = Arc::downgrade(&first_level_fail.clone());
-            queue.push_back(child.clone());
-        }
-        while let Some(node) = queue.pop_front() {
-            let cur = node.borrow();
-            // Find fail for all children
-            for (i, child) in cur.children.iter() {
-                // Father fail
-                let mut fafail = cur.fail.clone();
-                // Find father fail until fafail is none or fafail.children[i] is not none
-                while fafail.upgrade().is_some()
-                    && fafail
-                        .upgrade()
-                        .unwrap()
-                        .borrow()
-                        .children
-                        .get(&i)
-                        .is_none()
-                {
-                    fafail = fafail.upgrade().unwrap().borrow().fail.clone();
-                }
-                let temp = match fafail.upgrade() {
-                    // Fafail is none ,we knonw fafail is root
-                    None => Arc::downgrade(&self.root.clone()),
-                    // Else fafail.children[i] will be child fail poiter
-                    Some(v) => {
-                        let children_i = v.borrow().children.get(&i).unwrap().clone();
-                        children_i.borrow().key_word_len.iter().for_each(|&x| {
-                            child.borrow_mut().key_word_len.push(x);
-                        });
-                        // Append key_word_len for other key_word
-                        Arc::downgrade(&v.borrow().children.get(&i).unwrap().clone())
+        unsafe {
+            let first_level_fail = self.root.unwrap();
+            for (_i, child) in (*self.root.unwrap().as_ptr()).children.iter() {
+                (*child.as_ptr()).fail = Some(first_level_fail);
+                queue.push_back(child);
+            }
+            while let Some(node) = queue.pop_front() {
+                let cur = node;
+                // Find fail for all children
+                for (i, child) in (*cur.as_ptr()).children.iter() {
+                    // Father fail
+                    let mut fafail = (*cur.as_ptr()).fail;
+                    // Find father fail until fafail is none or fafail.children[i] is not none
+                    while fafail.is_some() && (*fafail.unwrap().as_ptr()).children.get(&i).is_none()
+                    {
+                        fafail = (*fafail.unwrap().as_ptr()).fail;
                     }
-                };
-                child.borrow_mut().fail = temp;
-                queue.push_back(child.clone())
+                    let temp = match fafail {
+                        // Fafail is none ,we knonw fafail is root
+                        None => self.root,
+                        // Else fafail.children[i] will be child fail poiter
+                        Some(v) => {
+                            let children_i = (*v.as_ptr()).children.get(&i).unwrap();
+                            (*children_i.as_ptr()).ext.iter().for_each(|x| {
+                                (*child.as_ptr()).push(x.clone());
+                            });
+                            // Append key_word_len for other key_word
+                            Some(*(*v.as_ptr()).children.get(&i).unwrap())
+                        }
+                    };
+                    (*child.as_ptr()).fail = temp;
+                    queue.push_back(child)
+                }
             }
         }
     }
     /// Query all key_words input text string
-    /// 
-    /// # Examples 
+    ///
+    /// # Examples
     ///
     ///
     /// ```
@@ -233,38 +267,223 @@ impl Trie {
     /// assert_eq!(matches[7], "cca".as_bytes().as_ref());
     /// ```
     pub fn query<'a>(&self, text: &'a [Value]) -> Vec<&'a [Value]> {
-        let mut result: Vec<&[Value]> = Vec::new();
-        let mut cur = Arc::downgrade(&self.root);
-        for (i, e) in text.iter().enumerate() {
-            if let Some(v) = cur.upgrade() {
-                // Find  child, child is none, let fail.children[e]
-                // until fail.children[e] is not none or fail equal none
-                let mut child = Arc::downgrade(&v.clone());
-                while child.upgrade().unwrap().borrow().children.get(e).is_none() {
-                    if child.upgrade().unwrap().borrow().fail.upgrade().is_none() {
-                        child = Arc::downgrade(&self.root.clone());
-                        break;
-                    }
-                    child = child.upgrade().unwrap().borrow().fail.clone();
-                }
-                cur = match child.upgrade().unwrap().borrow().children.get(e) {
-                    None => Arc::downgrade(&self.root),
-                    Some(child) => {
-                        result.append(
-                            &mut child
-                                .borrow()
-                                .key_word_len
-                                .iter()
-                                .map(|x| &text[i + 1 - x..i + 1])
-                                .collect(),
-                        );
-                        Arc::downgrade(&child)
-                    }
-                }
+        self.query_ext(text)
+            .iter()
+            .map(|(i, x)| &text[*i - x.get_len()..*i])
+            .collect()
+    }
+    /// Query total weight for text
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word("abc".as_bytes().to_vec());
+    /// tree.add_key_word("bc".as_bytes().to_vec());
+    /// tree.build();
+    /// assert_eq!(2, tree.query_total_weight("abc".as_bytes().as_ref()));
+    ///
+    ///
+    /// #[derive(Clone)]
+    /// struct Ext {
+    /// cate: usize,
+    /// weight: usize,
+    /// len: usize,
+    /// }
+    /// impl trie::NodeExt for Ext {
+    /// fn get_len(&self) -> usize {
+    ///     self.len
+    /// }
+    /// fn eq(&self, other: &Self) -> bool {
+    ///     self.len == other.len
+    /// }
+    /// fn get_weight(&self) -> usize {
+    ///     self.weight
+    /// }
+    /// fn get_cate(&self) -> usize {
+    ///     self.cate
+    /// }
+    /// }
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word_ext(
+    ///     "abc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 2,
+    ///         len: 3,
+    ///     },
+    /// );
+    /// tree.add_key_word_ext(
+    ///     "bc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// assert_eq!(3, tree.query_total_weight("abc".as_bytes().as_ref()));
+    /// ```
+    pub fn query_total_weight(&self, text: &[Value]) -> usize {
+        self.query_ext(text)
+            .iter()
+            .fold(0usize, |acc, (_, x)| acc + x.get_weight())
+    }
+    /// Query Category weight for text
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use word_sensitive::trie;
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word("abc".as_bytes().to_vec());
+    /// tree.add_key_word("bc".as_bytes().to_vec());
+    /// tree.build();
+    /// assert_eq!(
+    ///     Some(&2),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    /// );
+    /// #[derive(Clone)]
+    /// struct Ext {
+    /// cate: usize,
+    /// weight: usize,
+    /// len: usize,
+    /// }
+    /// impl trie::NodeExt for Ext {
+    /// fn get_len(&self) -> usize {
+    ///     self.len
+    /// }
+    /// fn eq(&self, other: &Self) -> bool {
+    ///     self.len == other.len
+    /// }
+    /// fn get_weight(&self) -> usize {
+    ///     self.weight
+    /// }
+    /// fn get_cate(&self) -> usize {
+    ///     self.cate
+    /// }
+    /// }
+    /// let mut tree = trie::Trie::default();
+    /// tree.add_key_word_ext(
+    ///     "abc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 2,
+    ///         len: 3,
+    ///     },
+    /// );
+    /// tree.add_key_word_ext(
+    ///     "bc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 1,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// assert_eq!(
+    ///     Some(&3),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    /// );
+
+    /// tree.add_key_word_ext(
+    ///     "bc".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 2,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// tree.add_key_word_ext(
+    ///     "ab".as_bytes().to_vec(),
+    ///     Ext {
+    ///         cate: 2,
+    ///         weight: 1,
+    ///         len: 2,
+    ///     },
+    /// );
+    /// tree.build();
+    /// assert_eq!(
+    ///     Some(&2),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&1)
+    /// );
+    /// assert_eq!(
+    ///     Some(&2),
+    ///     tree.query_cate_weight("abc".as_bytes().as_ref()).get(&2)
+    /// );
+
+    /// ```
+    pub fn query_cate_weight(&self, text: &[Value]) -> HashMap<usize, usize> {
+        let mut result = HashMap::new();
+        self.query_ext(text).iter().for_each(|(_i, x)| {
+            if let Some(e) = result.get_mut(&x.get_cate()) {
+                *e += x.get_weight();
             } else {
-                cur = Arc::downgrade(&self.root);
+                result.insert(x.get_cate(), x.get_weight());
+            }
+        });
+        result
+    }
+    pub fn query_ext<'a>(&self, text: &'a [Value]) -> Vec<(usize, &T)> {
+        let mut result = Vec::new();
+        let mut cur = self.root;
+        for (i, e) in text.iter().enumerate() {
+            unsafe {
+                if let Some(v) = cur {
+                    // Find  child, child is none, let fail.children[e]
+                    // until fail.children[e] is not none or fail equal none
+                    let mut child = v;
+                    while (*child.as_ptr()).children.get(e).is_none() {
+                        if (*child.as_ptr()).fail.is_none() {
+                            child = self.root.unwrap();
+                            break;
+                        }
+                        child = (*child.as_ptr()).fail.unwrap();
+                    }
+                    cur = match (*child.as_ptr()).children.get(e) {
+                        None => self.root,
+                        Some(child) => {
+                            result.append(
+                                &mut (*child.as_ptr()).ext.iter().map(|x| (i + 1, x)).collect(),
+                            );
+                            Some(*child)
+                        }
+                    }
+                } else {
+                    cur = self.root;
+                }
             }
         }
         result
     }
 }
+
+impl<T> Drop for Trie<T> {
+    fn drop(&mut self) {
+        let mut queue = VecDeque::new();
+        let mut queue_drop = VecDeque::new();
+        unsafe {
+            let node = self.root.unwrap();
+            queue.push_back(&node);
+            queue_drop.push_back(&node);
+            while let Some(node) = queue.pop_front() {
+                // Find all children
+                for (_i, child) in (*node.as_ptr()).children.iter() {
+                    queue_drop.push_back(child);
+                    queue.push_back(child)
+                }
+            }
+            while let Some(node) = queue_drop.pop_back() {
+                let mm = Box::from_raw(node.as_ptr());
+                drop(mm);
+            }
+        }
+        self.root = None;
+    }
+}
+unsafe impl<T> Send for Trie<T> {}
+
+unsafe impl<T> Sync for Trie<T> {}
