@@ -427,6 +427,21 @@ impl<T: NodeExt + Clone> Trie<T> {
         });
         result
     }
+    pub fn query_all<'a>(&self, text: &'a [Value]) -> (usize, HashMap<usize, (usize, Vec<&'a [Value]>)>){
+       let mut result: HashMap<usize, (usize, Vec<&'a[Value]>)> = HashMap::new();
+       let mut total_weight = 0;
+        self.query_ext(text).iter().for_each(|(i, x)| {
+            if let Some((e, keywords)) = result.get_mut(&x.get_cate()) {
+                *e += x.get_weight();
+                total_weight += x.get_weight();
+                (*keywords).push(&text[*i - x.get_len()..*i]);
+            } else {
+                total_weight += x.get_weight();
+                result.insert(x.get_cate(), (x.get_weight(), vec![&text[*i - x.get_len()..*i]]));
+            }
+        });
+        (total_weight, result)
+    }
     pub fn query_ext<'a>(&self, text: &'a [Value]) -> Vec<(usize, &T)> {
         let mut result = Vec::new();
         let mut cur = self.root;

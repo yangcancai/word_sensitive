@@ -498,3 +498,39 @@ fn leak() {
     tree.add_key_word("abc".as_bytes().to_vec());
     tree.build();
 }
+#[test]
+fn query_all(){
+    let mut tree = trie::Trie::default();
+tree.add_key_word_ext(
+        "abc".as_bytes().to_vec(),
+        Ext {
+            cate: 1,
+            weight: 2,
+            len: 3,
+        },
+    );
+    tree.add_key_word_ext(
+        "bc".as_bytes().to_vec(),
+        Ext {
+            cate: 1,
+            weight: 1,
+            len: 2,
+        },
+    );
+ tree.add_key_word_ext(
+        "cd".as_bytes().to_vec(),
+        Ext {
+            cate: 2,
+            weight: 1,
+            len: 2,
+        },
+    );
+   
+    tree.build();
+
+    let (total_weight, map) = tree.query_all("abcd".as_bytes().as_ref());
+    assert_eq!(total_weight, 4);
+    assert_eq!(map[&1], (3, vec!["abc".as_bytes(),"bc".as_bytes()]));
+    assert_eq!(map[&2], (1, vec!["cd".as_bytes()]));
+    assert_eq!(map.len(), 2);
+}
